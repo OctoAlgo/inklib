@@ -15,4 +15,8 @@ EXPORTS
     tpl_char_camera
     tpl_events
     tpl_events_dropped
+    tpl_state_size
+    tpl_save_state
+    tpl_load_state
+    tpl_state_hash
     tpl_get_api

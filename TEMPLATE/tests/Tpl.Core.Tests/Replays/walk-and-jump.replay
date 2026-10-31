@@ -6,6 +6,7 @@ units: native
 world: flat
 start: 0 0 0 0
 tolerance: 0.01
+hash: 0x04b1bf47678d74b4
 
 ticks buttons move_x move_y look_x look_y | x y z yaw state
 10 0 0 0 0 0 | 0 0 0 0 Idle

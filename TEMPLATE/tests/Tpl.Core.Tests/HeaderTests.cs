@@ -91,7 +91,8 @@ namespace Tpl.Tests
         public void CoreFunctionsExist()
         {
             string[] core = { "api_version", "last_error", "units", "world_create", "world_destroy", "char_add", "char_remove",
-                              "char_input", "world_tick", "char_state", "char_camera", "events", "events_dropped", "get_api" };
+                              "char_input", "world_tick", "char_state", "char_camera", "events", "events_dropped",
+                              "state_size", "save_state", "load_state", "state_hash", "get_api" };
             foreach (string f in core) Assert.Matches($@"\btpl_{f}\(", Header());
         }
     }

@@ -32,4 +32,4 @@ Write the next stage here when v1 is done.
 
 - Rendering, animation playback, sound playback (events tell the host).
 - Shipping any game data.
-- Optional modules (SPEC.md section 11) until the core is done.
+- Optional modules (SPEC.md section 12) until the core is done.

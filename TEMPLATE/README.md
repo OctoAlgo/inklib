@@ -49,6 +49,11 @@ tpl_world_tick(w, 1);
 tpl_char_state(w, id, &state);
 tpl_char_camera(w, id, &camera);
 n = tpl_events(w, events, 32);
+/* rollback hosts: snapshot, hash, restore (free unless called) */
+int32_t size = tpl_state_size(w);
+tpl_save_state(w, buf, size);
+uint64_t h = tpl_state_hash(w);
+tpl_load_state(w, buf, size);
 /* at the end: */
 tpl_world_destroy(w);
 ```

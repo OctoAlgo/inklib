@@ -6,8 +6,9 @@ own game data and reverse-engineered rules. [libsm64](https://github.com/libsm64
 is the model.
 
 - [SPEC.md](SPEC.md): the standard. Naming, C API shape, units, collision,
-  determinism and replays, camera, provenance, data rules, packaging,
-  optional modules.
+  determinism (same bits on every machine) and replays, rollback support
+  (snapshots, state hash, event ids), camera, provenance, data rules,
+  packaging, optional modules, and the planned inklib-net add-on.
 - [TEMPLATE/](TEMPLATE/): copy this to start a new lib (`rename.sh`). It
   builds and its tests pass in CI.
 - [COMPLIANCE.md](COMPLIANCE.md): where the existing libs stand.

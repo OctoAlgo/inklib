@@ -87,6 +87,10 @@ namespace Tpl.Native
         public delegate* unmanaged[Cdecl]<void*, int, CCamera*, int> CharCamera;
         public delegate* unmanaged[Cdecl]<void*, Event*, int, int> Events;
         public delegate* unmanaged[Cdecl]<void*, long> EventsDropped;
+        public delegate* unmanaged[Cdecl]<void*, int> StateSize;
+        public delegate* unmanaged[Cdecl]<void*, void*, int, int> SaveState;
+        public delegate* unmanaged[Cdecl]<void*, void*, int, int> LoadState;
+        public delegate* unmanaged[Cdecl]<void*, ulong> StateHash;
     }
 
     /// <summary>Forwards Core's collision questions to the host's C callbacks.</summary>

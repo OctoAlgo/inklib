@@ -19,6 +19,11 @@
  * The lib reads and writes only min(size, its own size) bytes; missing fields are zero.
  *
  * Collision callbacks needed: ground, segment, overlap. sweep is not used (may be NULL).
+ *
+ * Rollback: tpl_save_state / tpl_load_state snapshot the whole world (characters, cameras,
+ * inputs, tick). tpl_state_hash checks two machines agree. The lib keeps no history and these
+ * cost nothing unless called. The simulation gives the same bits on every machine (no platform
+ * maths), and sticks are quantised to steps of 1/127.
  */
 #ifndef TPL_H
 #define TPL_H
@@ -134,9 +139,10 @@ typedef struct tpl_shape {
 } tpl_shape;
 
 typedef struct tpl_event {
+    int64_t id;       /* unique in the world; the same when the tick is simulated again (rollback) */
+    int64_t tick;     /* the tick the event belongs to */
     int32_t type;     /* TPL_EVENT_* */
     int32_t char_id;
-    int64_t tick;     /* tick it happened in */
     int32_t a, b;
     tpl_vec3 position;
 } tpl_event;
@@ -236,6 +242,10 @@ typedef struct tpl_api {
     int32_t (*char_camera)(const tpl_world *world, int32_t id, tpl_camera *out);
     int32_t (*events)(tpl_world *world, tpl_event *out, int32_t max);
     int64_t (*events_dropped)(const tpl_world *world);
+    int32_t (*state_size)(const tpl_world *world);
+    int32_t (*save_state)(const tpl_world *world, void *buf, int32_t size);
+    int32_t (*load_state)(tpl_world *world, const void *buf, int32_t size);
+    uint64_t (*state_hash)(const tpl_world *world);
 } tpl_api;
 
 /* Returns TPL_API_VERSION of the built library. */
@@ -262,6 +272,16 @@ int32_t tpl_char_camera(const tpl_world *world, int32_t id, tpl_camera *out);
 int32_t tpl_events(tpl_world *world, tpl_event *out, int32_t max);
 /* Events lost because the buffer (256) was full, since create. */
 int64_t tpl_events_dropped(const tpl_world *world);
+/* Bytes tpl_save_state needs now (changes when characters are added or removed). 0 on error. */
+int32_t tpl_state_size(const tpl_world *world);
+/* Writes a snapshot of the whole world into buf. Returns the bytes written, 0 if size is too small.
+   The event buffer is not included. The snapshot only loads into a world of the same lib build. */
+int32_t tpl_save_state(const tpl_world *world, void *buf, int32_t size);
+/* Puts the world back to a snapshot. Pending events are dropped; ticks simulated again send their
+   events again with the same ids. On error the world is unchanged. */
+int32_t tpl_load_state(tpl_world *world, const void *buf, int32_t size);
+/* 64-bit hash of the snapshot (FNV-1a). Equal on two machines = same world. 0 on error. */
+uint64_t tpl_state_hash(const tpl_world *world);
 /* The function table. Never NULL. */
 const tpl_api *tpl_get_api(void);
 

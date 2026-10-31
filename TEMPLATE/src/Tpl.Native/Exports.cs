@@ -202,6 +202,52 @@ namespace Tpl.Native
             return world == null ? 0 : world.EventsDropped;
         }
 
+        [UnmanagedCallersOnly(EntryPoint = "tpl_state_size", CallConvs = new[] { typeof(CallConvCdecl) })]
+        static int StateSize(void* w)
+        {
+            World? world = Get(w);
+            return world == null ? Fail("world is NULL") : world.StateSize;
+        }
+
+        [UnmanagedCallersOnly(EntryPoint = "tpl_save_state", CallConvs = new[] { typeof(CallConvCdecl) })]
+        static int SaveState(void* w, void* buf, int size)
+        {
+            try
+            {
+                World? world = Get(w);
+                if (world == null) return Fail("world is NULL");
+                if (buf == null || size < world.StateSize) return Fail($"buffer needs {world.StateSize} bytes");
+                return world.SaveState(new Span<byte>(buf, size));
+            }
+            catch (Exception e) { return Fail(e.Message); }
+        }
+
+        [UnmanagedCallersOnly(EntryPoint = "tpl_load_state", CallConvs = new[] { typeof(CallConvCdecl) })]
+        static int LoadState(void* w, void* buf, int size)
+        {
+            try
+            {
+                World? world = Get(w);
+                if (world == null) return Fail("world is NULL");
+                if (buf == null || size <= 0) return Fail("buf is NULL or empty");
+                string? error = world.LoadState(new ReadOnlySpan<byte>(buf, size));
+                return error == null ? 1 : Fail(error);
+            }
+            catch (Exception e) { return Fail(e.Message); }
+        }
+
+        [UnmanagedCallersOnly(EntryPoint = "tpl_state_hash", CallConvs = new[] { typeof(CallConvCdecl) })]
+        static ulong StateHash(void* w)
+        {
+            try
+            {
+                World? world = Get(w);
+                if (world == null) { Fail("world is NULL"); return 0; }
+                return world.StateHash();
+            }
+            catch (Exception e) { Fail(e.Message); return 0; }
+        }
+
         static CApi* _api;
 
         [UnmanagedCallersOnly(EntryPoint = "tpl_get_api", CallConvs = new[] { typeof(CallConvCdecl) })]
@@ -225,6 +271,10 @@ namespace Tpl.Native
             api->CharCamera = &CharCamera;
             api->Events = &Events;
             api->EventsDropped = &EventsDropped;
+            api->StateSize = &StateSize;
+            api->SaveState = &SaveState;
+            api->LoadState = &LoadState;
+            api->StateHash = &StateHash;
             _api = api; // two threads racing here leak one small table; both are valid
             return _api;
         }

@@ -8,7 +8,8 @@ The rules come from reverse engineering. Data comes from the player's own disc. 
 
 Each inklib is useful on its own. A host can drop in one lib and get the character, its controls and
 its camera. Nothing here assumes that several libs meet in one game. That is the later "inklib-arena"
-add-on (section 11). It must not leak into the core.
+add-on (section 12). It must not leak into the core.
+Online play is the optional "inklib-net" add-on (section 13); every lib is ready for it (section 6).
 
 Users never depend on an inklib runtime package. There is no shared `inklib.dll` and no shared header.
 A new lib copies [TEMPLATE/](TEMPLATE/) and renames it. Everything shared is a convention written here.
@@ -45,9 +46,13 @@ it documents every field.
 | `int32_t <p>_char_input(<p>_world *world, int32_t id, const <p>_input *input)` | Sets the pad for the next ticks. Input stays until the next call. |
 | `int32_t <p>_world_tick(<p>_world *world, int32_t ticks)` | Steps `ticks` fixed ticks (section 5). |
 | `int32_t <p>_char_state(const <p>_world *world, int32_t id, <p>_state *out)` | Position, velocity, facing, state, animation. |
-| `int32_t <p>_char_camera(const <p>_world *world, int32_t id, <p>_camera *out)` | The game's own camera (section 6). |
+| `int32_t <p>_char_camera(const <p>_world *world, int32_t id, <p>_camera *out)` | The game's own camera (section 7). |
 | `int32_t <p>_events(<p>_world *world, <p>_event *out, int32_t max)` | Moves up to `max` events out of the buffer, oldest first. Returns how many. |
 | `int64_t <p>_events_dropped(const <p>_world *world)` | Events lost because the buffer was full, since create. |
+| `int32_t <p>_state_size(const <p>_world *world)` | Bytes a snapshot of the world needs now (section 6). |
+| `int32_t <p>_save_state(const <p>_world *world, void *buf, int32_t size)` | Writes a complete snapshot. Returns the bytes written, 0 if `size` is too small. |
+| `int32_t <p>_load_state(<p>_world *world, const void *buf, int32_t size)` | Puts the world back to a snapshot. On error the world is unchanged. |
+| `uint64_t <p>_state_hash(const <p>_world *world)` | 64-bit hash of the snapshot, for desync checks. 0 only on error. |
 | `const <p>_api *<p>_get_api(void)` | The function table. Never NULL. |
 
 Return rule: functions that return `int32_t` return 1 (or an id) on success and 0 on error, and set the
@@ -69,10 +74,11 @@ buffer is empty; that is not an error.
 - `<p>_state`: `size`, `state` (lib enum, `<P>_STATE_*`), `anim` (the game's animation id,
   -1 if none), `grounded`, `tick`, `position` (feet), `velocity`, `yaw`, `ground_surface`
   (section 4 flags).
-- `<p>_event`: `type`, `char_id`, `tick`, `a`, `b`, `position`. Types 1..255 are standard:
+- `<p>_event`: `id`, `tick`, `type`, `char_id`, `a`, `b`, `position`. `id` and `tick` are for
+  rollback hosts (section 6). Types 1..255 are standard:
   `STATE` (a = old, b = new), `LAND`, `LEAVE_GROUND`, `SOUND` (a = the game's sound id; the host
   plays it). Types 256 and up are the lib's own.
-- `<p>_units_info`, `<p>_camera`, `<p>_hit`, `<p>_shape`, `<p>_collision`: sections 3, 4 and 6.
+- `<p>_units_info`, `<p>_camera`, `<p>_hit`, `<p>_shape`, `<p>_collision`: sections 3, 4 and 7.
 - `<p>_api`: `size`, `api_version`, `prefix` (string, for example `"fc"`), then one pointer per
   function above in table order, `get_api` excluded. A lib MAY append its own functions after the
   standard ones. Because every lib's table starts the same way, a host can load any inklib with
@@ -121,7 +127,7 @@ turns from +X towards +Y. Velocity is metres per second.
 
 A host picks one with `<p>_world_config.units`. Every position, direction, velocity and angle that
 crosses the API (state, camera, events, and the collision callbacks) is then in that convention.
-Field of view is always radians (section 6). Sticks are always -1..1.
+Field of view is always radians (section 7). Sticks are always -1..1.
 
 - `<P>_UNITS_NATIVE` = 0: the game's numbers, unchanged. libfc returns 16.16 values as exact doubles.
   This is what replays compare against when they are game logs.
@@ -186,9 +192,34 @@ The character never reports itself: the host leaves the character's own body out
 - No wall clock (`DateTime`, `Stopwatch`, `Environment.TickCount`), no `System.Random`, no
   `HashCode.Combine`, no threads, no dictionary order in the simulation. A game RNG is reimplemented
   and seeded from the world config.
-- Same lib build, same inputs, same collision answers: same state, tick for tick.
-- Bit-exact across operating systems is a goal, not a promise: `Math.Sin`/`Cos`/`Atan2` come from
-  the platform. Games that used tables or integer maths (libfc) MUST use the same tables and maths.
+- Same lib build, same inputs, same collision answers: the same state, bit for bit, tick for tick,
+  **on every machine** (Windows, Linux, macOS; x64 and arm64). Rollback netcode depends on it.
+
+### Same bits on every machine
+
+A lib meets this one of two ways.
+
+1. **Integer or fixed-point maths**, as the game did (libfc: PS1 integers, 16.16, angle tables).
+   Integer maths is the same everywhere. Use the game's own tables, read from the user's data or
+   rebuilt from a formula; never a platform function.
+2. **Strict float rules**, for games that used floats (libray3):
+   - The simulation uses `double` only. `float` appears only at the API edge (stick input) and is
+     quantised there.
+   - Only `+ - * /`, comparisons, `Math.Abs/Min/Max/Floor/Ceiling/Round/Truncate/Sign/Clamp` and the
+     lib's own `DetMath` (template: `DetMath.cs`). IEEE 754 makes these the same everywhere.
+     `DetMath.Sqrt` is `Math.Sqrt`, which IEEE 754 requires to be correctly rounded.
+   - No `Math.Sin/Cos/Tan/Asin/Acos/Atan/Atan2/Pow/Exp/Log/Cbrt`, no `MathF`: they come from the
+     platform and differ in the last bit. Use `DetMath` (own series) or tables.
+   - No fused multiply-add: no `Math.FusedMultiplyAdd`, no SIMD (`System.Numerics`,
+     `System.Runtime.Intrinsics`), no platform-dependent code paths. RyuJIT (NativeAOT and .NET) does
+     not fuse on its own.
+   - No float-to-int conversion of NaN, infinity or out-of-range values (x64 and arm64 give different
+     results). Clamp first.
+   - Hosts that compile Core themselves (Unity IL2CPP, Burst) must turn off fused maths
+     (Burst: `FloatMode.Deterministic`; IL2CPP: no guarantee, so use the native library for online play).
+- A test scans Core for forbidden calls (`DeterminismTests` in the template), and every replay
+  stores the expected state hash after its last row (`hash:`). CI runs the replays on Linux x64,
+  Windows x64 and macOS arm64, and the C test checks the same hash through the native library.
 
 ### Replay format
 
@@ -215,6 +246,7 @@ ticks buttons move_x move_y look_x look_y | x y z yaw state
 ```
 
 - Header lines `key: value`; `#` starts a comment. `format`, `lib` and `source` are required.
+  `hash: 0x<16 hex digits>` is the `<p>_state_hash` after the last row; every replay in a lib has one.
 - `source` starts with `VERIFIED:` (where and how it was measured) or `UNVERIFIED:` (why it exists).
 - `units`: `native` or `shared`. `world`: a test world defined in the lib's tests (never game geometry).
   `start: x y z yaw`. `origin: x y z` (optional) means the checkpoints are game coordinates.
@@ -223,7 +255,37 @@ ticks buttons move_x move_y look_x look_y | x y z yaw state
   joined with `+`. `-` in a check column means "do not check". `state` is the state name.
 - A lib MAY add columns after `state`, named in the table header.
 
-## 6. Camera
+## 6. Rollback support
+
+Every inklib is ready for rollback netcode, and it costs nothing for hosts that do not use it:
+the functions below exist in every lib but do no work unless called, and the lib keeps no history.
+
+- **Snapshot.** `<p>_save_state` writes the whole world: every character, the camera, inputs, RNG
+  state, timers, the tick, the id counters. `<p>_load_state` makes the world exactly that again.
+  After `save; tick N; load; tick N` with the same inputs the world is bit for bit the same as
+  after the first `tick N`. The template tests this (`RollbackTests`).
+- **Fast.** Plain bytes, no allocations while saving, no pointers inside. A host saves every tick and
+  keeps a ring of them; a few hundred bytes per character is normal.
+- **Portable.** The snapshot layout is fixed little-endian, so the same world gives the same bytes on
+  every machine. It starts with a magic number, a format number and a hash of the tuning;
+  `<p>_load_state` refuses a snapshot from another lib, format or tuning.
+- **Not in the snapshot:** the event buffer (load empties it) and anything the host owns (collision
+  geometry, moving platforms): the host rolls those back itself.
+- **Hash.** `<p>_state_hash` is FNV-1a 64 over the snapshot bytes. Two machines that agree on the
+  hash at a tick have the same world.
+- **Input.** Sticks are quantised to `round(stick * 127) / 127` when they are set. The simulation
+  depends only on that integer and on `buttons`, so a netcode host sends 4 bytes of sticks plus the
+  buttons per character per tick.
+- **Events.** Every event has `id` and `tick`. `id` is unique in the world and the same when its tick
+  is simulated again with the same inputs (template: `tick * 65536 + place in that tick`). A rollback
+  host plays an event once, when it first sees its id. After a rollback, an event that comes again
+  with the same `id`, `type`, `char_id`, `a` and `b` is the same event (do not play it again); an
+  event the host played that does not come again by the time its tick is re-simulated was wrong
+  (stop or undo it, for example cut a looping sound).
+
+The netcode itself is never part of a lib (section 13).
+
+## 7. Camera
 
 Every lib ships its character's camera, because the camera is part of how the character feels.
 This is where libs differ most.
@@ -240,7 +302,7 @@ This is where libs differ most.
 - With `<P>_CHAR_NO_CAMERA` the lib skips the camera and `<p>_char_camera` returns 0.
 - A lib MAY add its own camera fields (the game's rotation matrix, for example) at the end.
 
-## 7. Provenance
+## 8. Provenance
 
 Every gameplay number is VERIFIED (with its source) or UNVERIFIED (with the reason it was picked).
 
@@ -256,7 +318,7 @@ Every gameplay number is VERIFIED (with its source) or UNVERIFIED (with the reas
   lib is wrong.
 - Every PR lists what it made VERIFIED and what is still UNVERIFIED.
 
-## 8. Data rules
+## 9. Data rules
 
 - No game data in any shipped or committed file: no levels, meshes, textures, sounds, scripts,
   executables, ELF or ISO files, raw or converted, not even "for a test". `.gitignore` blocks common
@@ -271,7 +333,7 @@ Every gameplay number is VERIFIED (with its source) or UNVERIFIED (with the reas
   domain), named at the top of the file. Never GPL, LGPL, AGPL or unlicensed code.
 - Each README says it is a fan project and that the user needs their own copy of the game.
 
-## 9. Packaging
+## 10. Packaging
 
 - Core: C#, `netstandard2.1`, C# 9, no NuGet dependencies, no engine references.
 - Native: NativeAOT shared library for `win-x64`, `linux-x64` and `osx-arm64`, from `<Name>.Native`.
@@ -279,12 +341,13 @@ Every gameplay number is VERIFIED (with its source) or UNVERIFIED (with the reas
 - Unity: a UPM package (`unity/`) with Core as C# source in an asmdef with `noEngineReferences`.
   Unity uses Core directly; it does not need the native library.
 - A minimal C example host (`native/example/host.c`): a flat floor, one character, prints its state.
-- CI on every PR: `dotnet test` on Linux and Windows; native build plus C test on linux-x64, win-x64 and
+- CI on every PR: `dotnet test` on Linux x64, Windows x64 and macOS arm64 (replay hashes must match on
+  all three); native build plus C test on linux-x64, win-x64 and
   osx-arm64; the data check.
 - A release attaches the three native libraries, the header, the `.def` and the Unity package.
 - Licence: TODO (octo decides; the standard does not pick one).
 
-## 10. Docs every lib has
+## 11. Docs every lib has
 
 - `CLAUDE.md`: hard rules for anyone, human or AI, working in the repo.
 - `Docs/PLAN.md`: stages; only one is built at a time.
@@ -292,7 +355,7 @@ Every gameplay number is VERIFIED (with its source) or UNVERIFIED (with the reas
 - `Docs/MEASURE.md`: how to verify each UNVERIFIED number in the real game.
 - `Docs/REPLAY.md`: the replay format and this lib's test worlds.
 
-## 11. Optional modules (not core)
+## 12. Optional modules (not core)
 
 Some hosts want more than movement. These parts are optional and are kept out of the core API so a
 lib stays useful on its own. Each module:
@@ -318,3 +381,34 @@ gets its own standard when it starts:
 | `vehicle` | `pilot` / `park`: a character enters or leaves something it drives. |
 
 Arena rules (meeting characters, scoring, unit scale between games) MUST NOT appear in a core lib.
+
+## 13. inklib-net (optional add-on, planned)
+
+inklib-net is a later, separate add-on for online play. It is described here so every lib is built
+for it; there is no code yet. No lib depends on it, and it holds no game rules.
+
+It is GGPO-style rollback over any inklib (or several), through the function tables:
+
+- **Input exchange.** Each player's input per tick (`buttons` + 4 quantised stick bytes) goes to every
+  peer, tagged with the tick, sent a few times to survive loss.
+- **Prediction.** When a remote input has not arrived, the host predicts it (repeat the last one) and
+  ticks on at once. It saves a snapshot every tick, keeping a ring of the last N (N = the rollback window, for
+  example 8 ticks at 60 Hz).
+- **Resimulation.** When a remote input arrives and differs from the prediction, the host loads the
+  snapshot of that tick, sets the real inputs, and ticks again to the present in one frame. Events
+  are reconciled by id (section 6).
+- **Desync detection.** Peers exchange `<p>_state_hash` for confirmed ticks (every tick or every few).
+  A mismatch is a desync: stop, report the tick, and save both sides' snapshots and inputs as a replay
+  for the bug report.
+- **Mixed tick rates.** All libs in a session hang off one host clock (for example 60 Hz). A lib with
+  rate R steps when `floor(frame * R / host_rate)` grows: a 30 Hz lib (libfc) steps every second frame
+  of a 60 Hz clock, a 60 Hz lib (libray3) every frame. Inputs, snapshots, hashes and rollbacks are
+  kept per lib tick and mapped through the same formula. Rates that do not divide the host rate work
+  the same way.
+- **Lockstep** (wait for all inputs, never predict) is the simple special case: N = 0, hashes still
+  checked. It suits games whose lib is too slow to resimulate.
+- **Spectating and replays** reuse the same input stream; a recorded session is an inklib replay per
+  character plus the hashes.
+
+What inklib-net does not do: matchmaking, NAT punch-through, accounts, voice. Those belong to the host.
+

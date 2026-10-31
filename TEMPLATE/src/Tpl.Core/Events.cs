@@ -20,9 +20,15 @@ namespace Tpl
     /// <summary>One event. Same layout as tpl_event. Position is in the world's unit convention.</summary>
     public struct Event
     {
+        /// <summary>
+        /// Unique in the world: Tick * 65536 + its place among the events of that tick. Simulating the
+        /// same tick again with the same inputs gives the same id (SPEC.md section 6).
+        /// </summary>
+        public long Id;
+        /// <summary>The tick the event belongs to.</summary>
+        public long Tick;
         public int Type;
         public int CharId;
-        public long Tick;
         public int A, B;
         public Vec3 Position;
     }

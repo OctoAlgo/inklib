@@ -106,6 +106,36 @@ int main(void)
     CHECK(cam.fov_y > 0.0 && cam.up.y == 1.0);
     CHECK(cam.position.x < s.position.x);
 
+    /* Rollback: save, step, load, step the same again: same hash, same events. */
+    {
+        static unsigned char snap[4096];
+        int32_t size = tpl_state_size(w), written;
+        uint64_t h1, h2;
+        tpl_event e1[64], e2[64];
+        int32_t n1, n2;
+        CHECK(size > 0 && size <= (int32_t)sizeof snap);
+        CHECK(tpl_save_state(w, snap, size - 1) == 0);
+        written = tpl_save_state(w, snap, sizeof snap);
+        CHECK(written == size);
+        tpl_events(w, ev, 64);                      /* empty the buffer */
+        in = pad(0, 0.5f, 1.0f);
+        tpl_char_input(w, id, &in);
+        tpl_world_tick(w, 90);
+        h1 = tpl_state_hash(w);
+        n1 = tpl_events(w, e1, 64);
+        CHECK(tpl_load_state(w, snap, written) == 1);
+        tpl_char_input(w, id, &in);
+        tpl_world_tick(w, 90);
+        h2 = tpl_state_hash(w);
+        n2 = tpl_events(w, e2, 64);
+        CHECK(h1 != 0 && h1 == h2);
+        CHECK(n1 > 0 && n1 == n2);
+        for (i = 0; i < n1 && i < n2; i++) CHECK(e1[i].id == e2[i].id && e1[i].tick == e2[i].tick && e1[i].type == e2[i].type);
+        snap[0] ^= 0xFF;                            /* a broken snapshot is refused */
+        CHECK(tpl_load_state(w, snap, written) == 0);
+        CHECK(tpl_state_hash(w) == h2);
+    }
+
     /* Removed characters are gone; ids are not reused. */
     CHECK(tpl_char_remove(w, id) == 1);
     CHECK(tpl_char_state(w, id, &s) == 0);
@@ -154,7 +184,30 @@ int main(void)
         memset(&s, 0, sizeof s);
         s.size = sizeof s;
         CHECK(api->char_state(w, id, &s) == 1 && s.tick == 10);
+        CHECK(api->state_hash(w) == tpl_state_hash(w) && api->state_size(w) == tpl_state_size(w));
         api->world_destroy(w);
+    }
+
+    /* Same bits on every machine: the inputs of tests/Tpl.Core.Tests/Replays/walk-and-jump.replay
+       must end in the hash stored there. If you record that replay again, update this number. */
+    {
+        static const struct { int ticks; uint32_t buttons; float mx, my; } rows[] = {
+            { 10, 0, 0.0f, 0.0f }, { 30, 0, 0.0f, 1.0f }, { 1, TPL_BUTTON_JUMP, 0.0f, 1.0f },
+            { 40, 0, 0.0f, 1.0f }, { 30, 0, 1.0f, 0.0f },
+        };
+        w = tpl_world_create(&wc, &col);
+        memset(&cc, 0, sizeof cc);
+        cc.size = sizeof cc;
+        id = tpl_char_add(w, &cc);
+        for (i = 0; i < (int32_t)(sizeof rows / sizeof rows[0]); i++) {
+            in = pad(rows[i].buttons, rows[i].mx, rows[i].my);
+            tpl_char_input(w, id, &in);
+            tpl_world_tick(w, rows[i].ticks);
+        }
+        if (tpl_state_hash(w) != 0x04b1bf47678d74b4ull)
+            printf("state hash 0x%016llx\n", (unsigned long long)tpl_state_hash(w));
+        CHECK(tpl_state_hash(w) == 0x04b1bf47678d74b4ull);
+        tpl_world_destroy(w);
     }
 
     if (failures == 0) printf("test_tpl: all checks passed\n");

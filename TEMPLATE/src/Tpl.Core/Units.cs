@@ -82,8 +82,8 @@ namespace Tpl
         /// <summary>Wraps an angle into -pi..pi. Integer-angle games wrap with a mask instead.</summary>
         public static double WrapAngle(double a)
         {
-            while (a > Math.PI) a -= 2 * Math.PI;
-            while (a < -Math.PI) a += 2 * Math.PI;
+            while (a > DetMath.Pi) a -= 2 * DetMath.Pi;
+            while (a < -DetMath.Pi) a += 2 * DetMath.Pi;
             return a;
         }
     }

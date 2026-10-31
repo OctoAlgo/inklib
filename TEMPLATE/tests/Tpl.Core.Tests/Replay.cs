@@ -33,6 +33,8 @@ namespace Tpl.Tests
         public double[] Start = new double[4];
         public double[]? Origin;
         public double Tolerance = 0.01;
+        /// <summary>Expected <see cref="World.StateHash"/> after the last row, if given.</summary>
+        public ulong? Hash;
         public readonly List<(string Field, string Value)> TuningOverrides = new List<(string, string)>();
         public readonly List<Row> Rows = new List<Row>();
 
@@ -80,6 +82,9 @@ namespace Tpl.Tests
                         case "start": r.Start = Numbers(value, 4, where); break;
                         case "origin": r.Origin = Numbers(value, 3, where); break;
                         case "tolerance": r.Tolerance = double.Parse(value, Inv); break;
+                        case "hash":
+                            if (!value.StartsWith("0x", StringComparison.Ordinal)) throw new FormatException($"{where}: hash: 0x followed by 16 hex digits");
+                            r.Hash = ulong.Parse(value.Substring(2), NumberStyles.HexNumber, Inv); break;
                         case "tuning":
                             string[] kv = Split(value);
                             if (kv.Length != 2) throw new FormatException($"{where}: tuning: Field value");
@@ -175,6 +180,9 @@ namespace Tpl.Tests
                 if (row.State is MoveState st && st != s.State)
                     return $"{Name} line {row.Line}, tick {s.Tick}: state is {s.State}, expected {st}";
             }
+            if (Hash is ulong want && w.StateHash() != want)
+                return $"{Name}: state hash after the last row is 0x{w.StateHash():x16}, expected 0x{want:x16}. "
+                     + "Positions matched, so the bits differ: a determinism problem (SPEC.md section 5), or a deliberate change (record again).";
             return null;
         }
 
@@ -190,6 +198,7 @@ namespace Tpl.Tests
             sb.Append($"name: {Name}\nsource: {source}\nunits: {(Units == UnitMode.Native ? "native" : "shared")}\nworld: {World}\n");
             sb.Append("start: " + string.Join(" ", Start.Select(F)) + "\n");
             sb.Append($"tolerance: {F(Tolerance)}\n");
+            sb.Append("hash: HASH\n");
             foreach (var (field, value) in TuningOverrides) sb.Append($"tuning: {field} {value}\n");
             sb.Append("\n" + string.Join(" ", Columns) + "\n");
             foreach (Row row in Rows)
@@ -201,7 +210,7 @@ namespace Tpl.Tests
                 sb.Append($"{row.Ticks} {FormatButtons(p.Buttons)} {F(p.MoveX)} {F(p.MoveY)} {F(p.LookX)} {F(p.LookY)} | ");
                 sb.Append($"{F(Math.Round(s.Position.X, 6))} {F(Math.Round(s.Position.Y, 6))} {F(Math.Round(s.Position.Z, 6))} {F(Math.Round(s.Yaw, 6))} {s.State}\n");
             }
-            return sb.ToString();
+            return sb.ToString().Replace("hash: HASH", $"hash: 0x{w.StateHash():x16}");
         }
 
         static string F(double v) => (v == 0 ? 0.0 : v).ToString("0.######", Inv);

@@ -42,6 +42,7 @@ One `key: value` per line, before the table. `#` starts a comment.
 | `origin` | no | The character's position in the game at tick 0. If given, x y z are game coordinates: the runner subtracts `origin` and adds `start`. |
 | `tolerance` | no (0.01) | Allowed difference per column, in the file's units. |
 | `tuning` | no, repeatable | `tuning: Field value` overrides one `Tuning` field. |
+| `hash` | yes in this lib | `hash: 0x` + 16 hex digits: `tpl_state_hash` after the last row. Positions within tolerance but a different hash means the bits differ: a determinism bug, or a deliberate change. |
 
 ## Table
 
@@ -78,6 +79,9 @@ After a deliberate change, record them again:
 ```
 INKLIB_RECORD_REPLAYS=$PWD/tests/Tpl.Core.Tests/Replays dotnet test --filter RecordRegressionReplays
 ```
+
+Recording rewrites the `hash:` lines too. `native/tests/test_tpl.c` repeats
+the hash of `walk-and-jump.replay` to check the native library; update it there.
 
 Measured (`VERIFIED`) replays are never re-recorded. If one fails, the lib
 is wrong.

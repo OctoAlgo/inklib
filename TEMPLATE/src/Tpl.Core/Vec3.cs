@@ -15,7 +15,7 @@ namespace Tpl
         public static Vec3 operator -(Vec3 a, Vec3 b) => new Vec3(a.X - b.X, a.Y - b.Y, a.Z - b.Z);
         public static Vec3 operator *(Vec3 a, double s) => new Vec3(a.X * s, a.Y * s, a.Z * s);
 
-        public double Length => Math.Sqrt(X * X + Y * Y + Z * Z);
+        public double Length => DetMath.Sqrt(X * X + Y * Y + Z * Z);
 
         public bool Equals(Vec3 o) => X == o.X && Y == o.Y && Z == o.Z;
         public override bool Equals(object? obj) => obj is Vec3 v && Equals(v);

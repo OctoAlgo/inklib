@@ -11,7 +11,7 @@ namespace Tpl
         Fall = 3,
     }
 
-    /// <summary>Camera styles (SPEC.md section 6). Values match TPL_CAMERA_*.</summary>
+    /// <summary>Camera styles (SPEC.md section 7). Values match TPL_CAMERA_*.</summary>
     public enum CameraStyle
     {
         FirstPerson = 1,
@@ -54,16 +54,21 @@ namespace Tpl
         public Vec3 CameraPosition { get; private set; }
         public Vec3 CameraTarget { get; private set; }
 
-        internal Character(int id, Tuning tuning, ICollisionWorld collision, Vec3 feet, double yaw, bool camera, int variant)
+        Character(int id, Tuning tuning, ICollisionWorld collision, bool camera, int variant)
         {
             Id = id;
             _t = tuning;
             _col = collision;
+            HasCamera = camera;
+            Variant = variant;
+        }
+
+        internal Character(int id, Tuning tuning, ICollisionWorld collision, Vec3 feet, double yaw, bool camera, int variant)
+            : this(id, tuning, collision, camera, variant)
+        {
             Position = feet;
             Yaw = yaw;
             CameraYaw = yaw;
-            HasCamera = camera;
-            Variant = variant;
             State = MoveState.Fall;
             if (_col.Ground(feet + Up * _t.StepHeight, _t.StepHeight * 2, out Hit g) && Math.Abs(g.Point.Y - feet.Y) <= _t.StepHeight)
             {
@@ -75,7 +80,49 @@ namespace Tpl
             UpdateCamera();
         }
 
-        static Vec3 Forward(double yaw) => new Vec3(Math.Cos(yaw), 0, -Math.Sin(yaw));
+        /// <summary>Bytes one character takes in a snapshot.</summary>
+        internal const int SnapshotBytes = 5 * 4 + 2 * 8 + 4 * 24 + 5 * 4;
+
+        /// <summary>Writes everything that shapes later ticks. Keep in step with <see cref="Load"/>.</summary>
+        internal void Save(ref SnapshotWriter w)
+        {
+            w.I32(Id);
+            w.I32(Variant);
+            w.U32((HasCamera ? 1u : 0) | (Grounded ? 2u : 0) | (_jumpWasDown ? 4u : 0));
+            w.I32((int)State);
+            w.U32((uint)GroundSurface);
+            w.V3(Position);
+            w.V3(Velocity);
+            w.F64(Yaw);
+            w.F64(CameraYaw);
+            w.V3(CameraPosition);
+            w.V3(CameraTarget);
+            w.U32((uint)Input.Buttons);
+            w.F32(Input.MoveX); w.F32(Input.MoveY); w.F32(Input.LookX); w.F32(Input.LookY);
+        }
+
+        internal static Character Load(ref SnapshotReader r, Tuning tuning, ICollisionWorld collision)
+        {
+            int id = r.I32(), variant = r.I32();
+            uint flags = r.U32();
+            var c = new Character(id, tuning, collision, (flags & 1) != 0, variant)
+            {
+                Grounded = (flags & 2) != 0,
+                _jumpWasDown = (flags & 4) != 0,
+            };
+            c.State = (MoveState)r.I32();
+            c.GroundSurface = (SurfaceFlags)r.U32();
+            c.Position = r.V3();
+            c.Velocity = r.V3();
+            c.Yaw = r.F64();
+            c.CameraYaw = r.F64();
+            c.CameraPosition = r.V3();
+            c.CameraTarget = r.V3();
+            c.Input = new PadInput { Buttons = (Buttons)r.U32(), MoveX = r.F32(), MoveY = r.F32(), LookX = r.F32(), LookY = r.F32() };
+            return c;
+        }
+
+        static Vec3 Forward(double yaw) => new Vec3(DetMath.Cos(yaw), 0, -DetMath.Sin(yaw));
 
         internal void Step(long tick, Action<Event> emit)
         {
@@ -86,17 +133,17 @@ namespace Tpl
 
             // Camera-relative stick: up = the way the camera looks.
             double sx = pad.MoveX, sy = pad.MoveY;
-            double tilt = Math.Sqrt(sx * sx + sy * sy);
+            double tilt = DetMath.Sqrt(sx * sx + sy * sy);
             if (tilt < _t.StickDeadzone) { sx = 0; sy = 0; tilt = 0; }
             else if (tilt > 1) { sx /= tilt; sy /= tilt; tilt = 1; }
             Vec3 fwd = Forward(CameraYaw);
-            Vec3 right = new Vec3(Math.Sin(CameraYaw), 0, Math.Cos(CameraYaw));
+            Vec3 right = new Vec3(DetMath.Sin(CameraYaw), 0, DetMath.Cos(CameraYaw));
             Vec3 dir = fwd * sy + right * sx;
             Vec3 v = Velocity;
             if (tilt > 0)
             {
                 double len = dir.Length;
-                Yaw = Math.Atan2(-dir.Z, dir.X);
+                Yaw = DetMath.Atan2(-dir.Z, dir.X);
                 v.X = dir.X / len * _t.WalkSpeed * tilt;
                 v.Z = dir.Z / len * _t.WalkSpeed * tilt;
             }
