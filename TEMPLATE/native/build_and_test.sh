@@ -28,6 +28,10 @@ case "$rid" in
         done
         ;;
     osx-*)
+        # NativeAOT leaves a relative install name; make it @rpath so hosts can find the dylib,
+        # then re-sign (arm64 refuses to load a dylib whose signature no longer matches).
+        install_name_tool -id @rpath/libtpl.dylib "$out/libtpl.dylib"
+        codesign --force --sign - "$out/libtpl.dylib"
         for prog in tests/test_tpl example/host; do
             name=$(basename "$prog")
             cc $cflags "native/$prog.c" -L "$out" -ltpl -Wl,-rpath,@executable_path -o "$out/$name"
