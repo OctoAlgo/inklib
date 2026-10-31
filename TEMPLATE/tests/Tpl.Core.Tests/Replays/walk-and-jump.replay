@@ -1,0 +1,15 @@
+format: inklib-replay 1
+lib: tpl 1
+name: walk forward, jump, land
+source: UNVERIFIED: regression, recorded from the template itself (ReplayTests.RecordRegressionReplays)
+units: native
+world: flat
+start: 0 0 0 0
+tolerance: 0.01
+
+ticks buttons move_x move_y look_x look_y | x y z yaw state
+10 0 0 0 0 0 | 0 0 0 0 Idle
+30 0 0 1 0 0 | 150 0 0 0 Walk
+1 jump 0 1 0 0 | 155 8 0 0 Jump
+40 0 0 1 0 0 | 355 123 0 0 Fall
+30 0 1 0 0 0 | 355 0 150 -1.570796 Walk

@@ -1,0 +1,9 @@
+{
+  "name": "com.inklib.tpl",
+  "version": "0.1.0",
+  "displayName": "libtpl",
+  "description": "TODO: one sentence. An inklib: one character from one game, exactly like the original. Core as C# source; no game data.",
+  "unity": "2021.3",
+  "author": { "name": "OctoAlgo" },
+  "license": "TODO"
+}
