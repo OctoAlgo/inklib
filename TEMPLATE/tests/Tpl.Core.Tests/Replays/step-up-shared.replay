@@ -1,0 +1,14 @@
+format: inklib-replay 1
+lib: tpl 1
+name: walk up a 20 cm step in shared units, stop at the wall
+source: UNVERIFIED: regression, recorded from the template itself (ReplayTests.RecordRegressionReplays)
+units: shared
+world: step
+start: 0 0 0 0
+tolerance: 0.01
+hash: 0xce5a982b41da1af7
+
+ticks buttons move_x move_y look_x look_y | x y z yaw state
+5 0 0 0 0 0 | 0 0 0 0 Idle
+60 0 0 1 0 0 | 2.95 0 0.2 0 Walk
+60 0 0 1 0 0 | 3.6 0 0.2 0 Walk

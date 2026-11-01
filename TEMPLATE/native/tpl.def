@@ -1,0 +1,22 @@
+; Exports of libtpl.dll. Used on Windows to make an import library for C hosts.
+; HeaderTests checks that this list matches the functions in tpl.h.
+LIBRARY libtpl
+EXPORTS
+    tpl_api_version
+    tpl_last_error
+    tpl_units
+    tpl_world_create
+    tpl_world_destroy
+    tpl_char_add
+    tpl_char_remove
+    tpl_char_input
+    tpl_world_tick
+    tpl_char_state
+    tpl_char_camera
+    tpl_events
+    tpl_events_dropped
+    tpl_state_size
+    tpl_save_state
+    tpl_load_state
+    tpl_state_hash
+    tpl_get_api
