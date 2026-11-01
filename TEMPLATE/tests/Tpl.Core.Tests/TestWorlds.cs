@@ -13,6 +13,9 @@ namespace Tpl.Tests
         readonly Block[] _blocks;
         public int Queries;
 
+        /// <summary>The optional sweep callback for a box, with the touch tolerance rule.</summary>
+        public bool SweepBox(Vec3 centre, Vec3 half, Vec3 move, out Hit hit) => TestSweep.Box(_blocks, centre, half, move, out hit);
+
         public TestWorld(params Block[] blocks) { _blocks = blocks; }
 
         public static TestWorld Make(string name)
@@ -74,6 +77,78 @@ namespace Tpl.Tests
                     return true;
                 }
             return false;
+        }
+    }
+
+    /// <summary>
+    /// Box sweep for the test world (the optional <c>sweep</c> callback), with the touch tolerance of
+    /// SPEC.md section 4: a box touching a surface slides along it and is blocked only moving into it.
+    /// </summary>
+    static class TestSweep
+    {
+        const double Far = 1e9;
+
+        /// <summary>Axis-aligned box (centre, half extents) moved by <paramref name="move"/>. First blocking hit, or false.</summary>
+        public static bool Box(TestWorld.Block[] blocks, Vec3 centre, Vec3 half, Vec3 move, out Hit hit)
+        {
+            hit = default;
+            bool any = false;
+            double best = double.MaxValue;
+            // The floor is a huge box below y = 0; each block is solid from y = 0 to its top.
+            if (One(new Vec3(-Far, -Far, -Far), new Vec3(Far, 0, Far), centre, half, move, out Hit h) && h.T < best) { best = h.T; hit = h; any = true; }
+            foreach (TestWorld.Block b in blocks)
+                if (One(new Vec3(b.MinX, 0, b.MinZ), new Vec3(b.MaxX, b.Top, b.MaxZ), centre, half, move, out h) && h.T < best)
+                { best = h.T; h.Surface = b.Surface; hit = h; any = true; }
+            return any;
+        }
+
+        static double Get(Vec3 v, int i) => i == 0 ? v.X : i == 1 ? v.Y : v.Z;
+
+        static Vec3 Axis(int i, double sign) => new Vec3(i == 0 ? sign : 0, i == 1 ? sign : 0, i == 2 ? sign : 0);
+
+        static bool One(Vec3 lo, Vec3 hi, Vec3 c, Vec3 h, Vec3 m, out Hit hit)
+        {
+            hit = default;
+            double tol = CollisionRules.TouchTolerance;
+            // Separation on each of the six faces of the box grown by the half extents; the largest is how far apart.
+            double sep = double.MinValue;
+            Vec3 normal = Vec3.Zero;
+            for (int i = 0; i < 3; i++)
+            {
+                double below = (Get(lo, i) - Get(h, i)) - Get(c, i);   // > 0: c is outside on the low side
+                double above = Get(c, i) - (Get(hi, i) + Get(h, i));   // > 0: c is outside on the high side
+                if (below > sep) { sep = below; normal = Axis(i, -1); }
+                if (above > sep) { sep = above; normal = Axis(i, 1); }
+            }
+            double into = m.X * normal.X + m.Y * normal.Y + m.Z * normal.Z;
+            if (sep < -tol) { hit = new Hit { Point = c, Normal = normal, T = 0 }; return true; }      // really inside
+            if (sep <= tol)                                                                             // touching
+            {
+                if (into >= 0) return false;
+                hit = new Hit { Point = c, Normal = normal, T = 0 };
+                return true;
+            }
+            // Apart: slab test on the grown box.
+            double enter = 0, exit = 1;
+            Vec3 n = Vec3.Zero;
+            for (int i = 0; i < 3; i++)
+            {
+                double ci = Get(c, i), mi = Get(m, i), l = Get(lo, i) - Get(h, i), u = Get(hi, i) + Get(h, i);
+                if (mi == 0)
+                {
+                    if (ci <= l || ci >= u) return false;
+                    continue;
+                }
+                double t0 = (l - ci) / mi, t1 = (u - ci) / mi;
+                double sign = -1;
+                if (t0 > t1) { double t = t0; t0 = t1; t1 = t; sign = 1; }
+                if (t0 > enter) { enter = t0; n = Axis(i, sign); }
+                if (t1 < exit) exit = t1;
+                if (enter > exit) return false;
+            }
+            if (n.Equals(Vec3.Zero)) return false;
+            hit = new Hit { Point = c + m * enter, Normal = n, T = enter };
+            return true;
         }
     }
 

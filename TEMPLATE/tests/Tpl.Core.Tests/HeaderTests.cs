@@ -33,6 +33,7 @@ namespace Tpl.Tests
             Assert.Equal(new Tuning().TickSeconds, double.Parse(Macro("TPL_TICK_SECONDS"), CultureInfo.InvariantCulture));
             Assert.Equal(new Tuning().InputDelayTicks, int.Parse(Macro("TPL_INPUT_DELAY_TICKS")));
             Assert.Equal(Units.SimBits, int.Parse(Macro("TPL_SIM_BITS")));
+            Assert.Equal(CollisionRules.TouchTolerance, double.Parse(Macro("TPL_TOUCH_TOLERANCE"), CultureInfo.InvariantCulture));
         }
 
         [Fact]

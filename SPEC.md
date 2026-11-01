@@ -185,6 +185,22 @@ material bits). The host sets what it knows; zero is plain solid ground.
 
 The character never reports itself: the host leaves the character's own body out of every answer.
 
+### Touch tolerance
+
+PhysX and most engines report a shape that starts touching the probe as a start overlap. Taken
+literally ("starts inside = hit at t 0"), a character could never slide along a floor or a wall it
+touches. So every lib states a touch tolerance, `<P>_TOUCH_TOLERANCE` (native length units, in its
+header), and the contract for `sweep` and `segment` is:
+
+- A shape that starts within the tolerance of a surface (just apart, or overlapping by less than the
+  tolerance) is **touching**, not blocked.
+- A touching surface blocks only when the move goes into it: `dot(move, normal) < 0`. Then the hit is
+  at `t` = 0 with that surface's normal. Moving along it or away from it is free.
+- A shape that starts deeper than the tolerance is a real start overlap: hit at `t` = 0.
+- Otherwise the first contact along the move is the hit, as usual.
+
+The template's test collision world follows this rule and tests it (`CollisionTests`).
+
 ## 5. Determinism
 
 **Closeness to the original is the top priority of every inklib.** The rules below serve it.
@@ -223,8 +239,9 @@ A lib meets this one of two ways.
      variable or cast it (`(float)`), so no runtime keeps extra precision. RyuJIT computes `float` in
      single precision; check other runtimes before relying on them.
    - Only `+ - * /`, comparisons, `Math.Abs/Min/Max/Floor/Ceiling/Round/Truncate/Sign/Clamp` and the
-     lib's own `DetMath` (template: `DetMath.cs`, double; a float32 lib keeps a float32 `DetMath`, or
-     computes in double and rounds once to float, which is also deterministic). IEEE 754 makes
+     lib's own `DetMath` (template: `DetMath.cs` for double and `DetMathF.cs` for float32, same functions, both checked
+     bit for bit on three platforms; a float32 lib may also compute in double and round once to
+     float, which is deterministic too). IEEE 754 makes
      these the same everywhere.
      `DetMath.Sqrt` is `Math.Sqrt`, which IEEE 754 requires to be correctly rounded.
    - No `Math.Sin/Cos/Tan/Asin/Acos/Atan/Atan2/Pow/Exp/Log/Cbrt`, no `MathF`: they come from the

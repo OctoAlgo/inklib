@@ -52,6 +52,7 @@ extern "C" {
 #define TPL_TICK_RATE                60  /* ticks per real second the host calls (pacing) */
 #define TPL_TICK_SECONDS             0.016666666666666666 /* game time one tick simulates, exact */
 #define TPL_INPUT_DELAY_TICKS        1   /* ticks before the game reads a new pad */
+#define TPL_TOUCH_TOLERANCE          0.5 /* native length units: closer than this counts as touching (SPEC.md section 4) */
 #define TPL_SIM_BITS                 64  /* the simulation's reals: 32 = float32, 64 = double, 0 = integer/fixed */
 
 enum {
