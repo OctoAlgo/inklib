@@ -17,9 +17,12 @@ draw and play.
 2. **Deterministic fixed tick, same bits on every machine.** Core steps in
    fixed ticks (`Tuning.TickRate`, the game's logic rate). No `System.Random`,
    no `DateTime`, no `Stopwatch`, no `Environment.TickCount`, no
-   `HashCode.Combine`, no threads, no dictionary order. Doubles only; no
+   `HashCode.Combine`, no threads, no dictionary order. Compute in the game's
+   precision (`TPL_SIM_BITS`: float32 if the game did, else double); no
    `Math.Sin/Cos/Atan2/Pow/...`, no `MathF`, no SIMD, no fused multiply-add:
-   use `DetMath`. `DeterminismTests` scans for these. Every replay stores a
+   use `DetMath`. Reproduce the game's real tick step (`Tuning.TickSeconds`)
+   and input delay (`Tuning.InputDelayTicks`): closeness to the original
+   comes first. `DeterminismTests` scans for these. Every replay stores a
    state hash, and CI checks it on Linux, Windows and macOS arm64.
    Recording a replay again changes its hash: also update the hash in
    `native/tests/test_tpl.c`.

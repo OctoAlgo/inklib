@@ -187,8 +187,21 @@ The character never reports itself: the host leaves the character's own body out
 
 ## 5. Determinism
 
-- Each lib has its own fixed tick: the game's logic rate (`<P>_TICK_RATE`, 30 for libfc, 60 for
-  libray3). `<p>_world_tick(world, n)` steps exactly n ticks. The host keeps its own accumulator.
+**Closeness to the original is the top priority of every inklib.** The rules below serve it.
+
+- Each lib has its own fixed tick. Two numbers describe it, and the header gives both:
+  - `<P>_TICK_RATE`: how many ticks per real second the host calls (30 for libfc, 60 for libray3).
+  - `<P>_TICK_SECONDS`: the exact game time one tick simulates. A lib reproduces its game's real
+    step, which need not be 1 / rate. Rayman 3 PC steps in whole milliseconds: 16 ms per frame at
+    60 Hz, so the game runs at 96 % of real time (its dt is clamped and averaged; at a steady 60 Hz
+    that settles on 16 ms). The lib uses the step the game really takes at its nominal rate,
+    measured, and never a step taken from the host's clock.
+- `<p>_world_tick(world, n)` steps exactly n ticks. The host keeps its own accumulator against
+  `<P>_TICK_RATE`. Shared-unit velocities are per second of game time (`<P>_TICK_SECONDS`).
+- **Input delay.** If the game reads the pad late (Rayman 3: 1 frame), the lib does the same by
+  default: `<P>_INPUT_DELAY_TICKS` in the header, measured. The flag `<P>_CHAR_NO_INPUT_DELAY`
+  in `<p>_char_config` MAY turn it off for hosts that add their own latency. Inputs set but not
+  yet read are part of the snapshot.
 - No wall clock (`DateTime`, `Stopwatch`, `Environment.TickCount`), no `System.Random`, no
   `HashCode.Combine`, no threads, no dictionary order in the simulation. A game RNG is reimplemented
   and seeded from the world config.
@@ -203,10 +216,16 @@ A lib meets this one of two ways.
    Integer maths is the same everywhere. Use the game's own tables, read from the user's data or
    rebuilt from a formula; never a platform function.
 2. **Strict float rules**, for games that used floats (libray3):
-   - The simulation uses `double` only. `float` appears only at the API edge (stick input) and is
-     quantised there.
+   - The simulation computes in the game's own precision: float32 if the game did (closer to the
+     original), else double. The header says which: `<P>_SIM_BITS` = 32, 64, or 0 for integer or
+     fixed point. The API structs still carry `double`, which holds float32 values exactly.
+   - float32 is just as deterministic under these rules. Store every intermediate in a `float`
+     variable or cast it (`(float)`), so no runtime keeps extra precision. RyuJIT computes `float` in
+     single precision; check other runtimes before relying on them.
    - Only `+ - * /`, comparisons, `Math.Abs/Min/Max/Floor/Ceiling/Round/Truncate/Sign/Clamp` and the
-     lib's own `DetMath` (template: `DetMath.cs`). IEEE 754 makes these the same everywhere.
+     lib's own `DetMath` (template: `DetMath.cs`, double; a float32 lib keeps a float32 `DetMath`, or
+     computes in double and rounds once to float, which is also deterministic). IEEE 754 makes
+     these the same everywhere.
      `DetMath.Sqrt` is `Math.Sqrt`, which IEEE 754 requires to be correctly rounded.
    - No `Math.Sin/Cos/Tan/Asin/Acos/Atan/Atan2/Pow/Exp/Log/Cbrt`, no `MathF`: they come from the
      platform and differ in the last bit. Use `DetMath` (own series) or tables.
@@ -271,6 +290,25 @@ the functions below exist in every lib but do no work unless called, and the lib
   `<p>_load_state` refuses a snapshot from another lib, format or tuning.
 - **Not in the snapshot:** the event buffer (load empties it) and anything the host owns (collision
   geometry, moving platforms): the host rolls those back itself.
+
+### Lib-owned world state
+
+Some characters change the world as part of their rules: a Splatoon lib's ink coverage, objects a
+character places. A lib MAY keep such state when it belongs to its character's rules.
+
+- The rules stay in the lib. The storage sits behind a store interface: a struct of host callbacks
+  (`<p>_store`: `size`, `user`, then lib-defined read/write calls, for example per surface chunk),
+  passed in `<p>_world_config` like the collision callbacks. NULL selects the built-in default store.
+- **Default store:** the state lives in the lib and is part of the snapshot and the hash. The host
+  does nothing extra.
+- **Host store:** the host owns the data (to draw it, or to share it with other systems) and rolls it
+  back itself. The lib says so in its header, and the snapshot and hash then leave that state out.
+- **Big state as deltas.** A snapshot MAY store big world state as changes instead of a full copy:
+  for example the lib keeps an undo journal of changed chunks for the last
+  `<p>_world_config.rollback_window` ticks (0 = no journal: free unless used), and a snapshot holds
+  its journal position. Any snapshot in the window MUST still load, in any order, and the hash still
+  covers the full state.
+- A lib without world state says so in its header (the template does).
 - **Hash.** `<p>_state_hash` is FNV-1a 64 over the snapshot bytes. Two machines that agree on the
   hash at a tick have the same world.
 - **Input.** Sticks are quantised to `round(stick * 127) / 127` when they are set. The simulation
