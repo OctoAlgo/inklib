@@ -30,6 +30,9 @@ namespace Tpl.Tests
             Assert.Equal(Units.Handedness, int.Parse(Macro("TPL_NATIVE_HANDEDNESS")));
             Assert.Equal(Units.VelocityPerTick, int.Parse(Macro("TPL_NATIVE_VELOCITY_PER_TICK")));
             Assert.Equal(new Tuning().TickRate, int.Parse(Macro("TPL_TICK_RATE")));
+            Assert.Equal(new Tuning().TickSeconds, double.Parse(Macro("TPL_TICK_SECONDS"), CultureInfo.InvariantCulture));
+            Assert.Equal(new Tuning().InputDelayTicks, int.Parse(Macro("TPL_INPUT_DELAY_TICKS")));
+            Assert.Equal(Units.SimBits, int.Parse(Macro("TPL_SIM_BITS")));
         }
 
         [Fact]

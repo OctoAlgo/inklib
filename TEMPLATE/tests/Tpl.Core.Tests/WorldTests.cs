@@ -48,7 +48,7 @@ namespace Tpl.Tests
             w.Step(60);
             CharacterState s = State(w, id);
             Assert.Equal(MoveState.Walk, s.State);
-            Assert.Equal(new Tuning().WalkSpeed * 60, s.Position.X, 9);
+            Assert.Equal(new Tuning().WalkSpeed * (60 - new Tuning().InputDelayTicks), s.Position.X, 9);
         }
 
         [Fact]
@@ -145,7 +145,7 @@ namespace Tpl.Tests
         {
             var (w, id) = Make();
             w.SetInput(id, JumpPad);
-            w.Step(1);
+            w.Step(1 + new Tuning().InputDelayTicks);
             var buf = new Event[16];
             int n = w.DrainEvents(buf);
             Assert.Contains(buf[..n], e => e.Type == (int)EventType.Sound && e.A == SoundIds.Jump);
@@ -156,6 +156,35 @@ namespace Tpl.Tests
             for (int i = 0; i < 400; i++) { w.SetInput(id, i % 2 == 0 ? JumpPad : default); w.Step(40); }
             Assert.True(w.EventsDropped > 0);
             Assert.Equal(World.EventCapacity, w.DrainEvents(new Event[1000]));
+        }
+
+        [Fact]
+        public void TheGameReadsThePadLateLikeTheOriginal()
+        {
+            int delay = new Tuning().InputDelayTicks;
+            var w = new World(new Tuning(), new TestWorld(), UnitMode.Native);
+            int late = w.AddCharacter(Vec3.Zero, 0);
+            int now = w.AddCharacter(new Vec3(0, 0, 500), 0, inputDelay: false);
+            w.SetInput(late, JumpPad);
+            w.SetInput(now, JumpPad);
+            for (int t = 1; t <= delay; t++)
+            {
+                w.Step(1);
+                Assert.Equal(MoveState.Idle, State(w, late).State);
+            }
+            w.Step(1);
+            Assert.Equal(MoveState.Jump, State(w, late).State);
+            Assert.True(State(w, now).Position.Y > State(w, late).Position.Y, "the character without delay jumped first");
+        }
+
+        [Fact]
+        public void InputDelayCanBeZeroInTuning()
+        {
+            var w = new World(new Tuning { InputDelayTicks = 0 }, new TestWorld(), UnitMode.Native);
+            int id = w.AddCharacter(Vec3.Zero, 0);
+            w.SetInput(id, JumpPad);
+            w.Step(1);
+            Assert.Equal(MoveState.Jump, State(w, id).State);
         }
 
         [Fact]
@@ -176,6 +205,8 @@ namespace Tpl.Tests
         {
             Assert.Throws<ArgumentException>(() => new World(new Tuning { TickRate = 0 }, new TestWorld(), UnitMode.Native));
             Assert.Throws<ArgumentException>(() => new World(new Tuning { Gravity = -1 }, new TestWorld(), UnitMode.Native));
+            Assert.Throws<ArgumentException>(() => new World(new Tuning { TickSeconds = 0 }, new TestWorld(), UnitMode.Native));
+            Assert.Throws<ArgumentException>(() => new World(new Tuning { InputDelayTicks = 9 }, new TestWorld(), UnitMode.Native));
         }
     }
 }

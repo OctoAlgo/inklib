@@ -71,6 +71,7 @@ namespace Tpl.Native
                 UpAxis = Units.UpAxis, UpSign = Units.UpSign, Handedness = Units.Handedness,
                 VelocityPerTick = Units.VelocityPerTick, TickRate = new Tuning().TickRate,
                 MetresPerUnit = Units.MetresPerUnit, RadiansPerUnit = Units.RadiansPerUnit,
+                TickSeconds = new Tuning().TickSeconds, InputDelayTicks = new Tuning().InputDelayTicks, SimBits = Units.SimBits,
             };
             return WriteOut(output, u, "out") ? 1 : 0;
         }
@@ -105,7 +106,7 @@ namespace Tpl.Native
                 World? world = Get(w);
                 if (world == null) return Fail("world is NULL");
                 if (!ReadIn(config, out CCharConfig c, "config")) return 0;
-                return world.AddCharacter(c.Position, c.Yaw, (c.Flags & 1u) == 0, c.Variant);
+                return world.AddCharacter(c.Position, c.Yaw, camera: (c.Flags & 1u) == 0, variant: c.Variant, inputDelay: (c.Flags & 2u) == 0);
             }
             catch (Exception e) { return Fail(e.Message); }
         }

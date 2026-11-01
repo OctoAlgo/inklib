@@ -15,8 +15,8 @@ namespace Tpl.Tests
         static World MakeWorld(out int a, out int b)
         {
             var w = new World(new Tuning(), TestWorld.Make("step"), UnitMode.Native);
-            a = w.AddCharacter(new Vec3(0, 0, 0), 0);
-            b = w.AddCharacter(new Vec3(0, 50, 300), 1, camera: false);
+            a = w.AddCharacter(new Vec3(0, 0, 0), 0);                                 // with the game's input delay
+            b = w.AddCharacter(new Vec3(0, 50, 300), 1, camera: false, inputDelay: false);
             return w;
         }
 
@@ -107,6 +107,29 @@ namespace Tpl.Tests
                 Assert.Equal(first[i].Type, again[i].Type);
             }
             for (int i = 1; i < n1; i++) Assert.True(first[i].Id > first[i - 1].Id, "ids rise and never repeat");
+        }
+
+        /// <summary>Inputs set but not yet read by the game are part of the snapshot.</summary>
+        [Fact]
+        public void DelayedInputsAreInTheSnapshot()
+        {
+            var w = new World(new Tuning { InputDelayTicks = 3 }, TestWorld.Make("flat"), UnitMode.Native);
+            int id = w.AddCharacter(Vec3.Zero, 0);
+            w.SetInput(id, new PadInput { MoveY = 1 });
+            w.Step(2);                         // the pad is set but the game has not read it yet
+            byte[] snap = Save(w);
+            w.Step(10);
+            ulong first = w.StateHash();
+            Assert.Null(w.LoadState(snap));
+            w.Step(10);
+            Assert.Equal(first, w.StateHash());
+            Assert.True(State(w, id).Position.X > 0);
+        }
+
+        static CharacterState State(World w, int id)
+        {
+            Assert.True(w.GetState(id, out CharacterState s));
+            return s;
         }
 
         [Fact]

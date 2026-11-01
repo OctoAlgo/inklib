@@ -6,11 +6,11 @@ units: native
 world: flat
 start: 0 0 0 0
 tolerance: 0.01
-hash: 0x04b1bf47678d74b4
+hash: 0x196007041dc1b243
 
 ticks buttons move_x move_y look_x look_y | x y z yaw state
 10 0 0 0 0 0 | 0 0 0 0 Idle
-30 0 0 1 0 0 | 150 0 0 0 Walk
-1 jump 0 1 0 0 | 155 8 0 0 Jump
-40 0 0 1 0 0 | 355 123 0 0 Fall
-30 0 1 0 0 0 | 355 0 150 -1.570796 Walk
+30 0 0 1 0 0 | 145 0 0 0 Walk
+1 jump 0 1 0 0 | 150 0 0 0 Walk
+40 0 0 1 0 0 | 350 125 0 0 Fall
+30 0 1 0 0 0 | 355 0 145 -1.570796 Walk

@@ -32,15 +32,17 @@ namespace Tpl.Tests
         {
             var n = new Vec3(1, 2, 3);
             Assert.Equal(n, Units.PositionOut(n, UnitMode.Native));
-            Assert.Equal(n, Units.VelocityOut(n, UnitMode.Native, 60));
+            Assert.Equal(n, Units.VelocityOut(n, UnitMode.Native, 1.0 / 60));
             Assert.Equal(0.5, Units.AngleOut(0.5, UnitMode.Native));
         }
 
         [Fact]
         public void VelocityPerTickBecomesMetresPerSecond()
         {
-            Vec3 v = Units.VelocityOut(new Vec3(5, 0, 0), UnitMode.Shared, 60);
+            Vec3 v = Units.VelocityOut(new Vec3(5, 0, 0), UnitMode.Shared, 1.0 / 60);
             Assert.Equal(3.0, v.X, 12);
+            // A game that steps 16 ms per tick (Rayman 3 PC) moves 5 cm in 0.016 s of game time.
+            Assert.Equal(3.125, Units.VelocityOut(new Vec3(5, 0, 0), UnitMode.Shared, 0.016).X, 12);
         }
 
         /// <summary>Shared space is right-handed too: X cross Y = Z after conversion.</summary>

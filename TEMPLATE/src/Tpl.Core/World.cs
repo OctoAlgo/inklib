@@ -87,10 +87,15 @@ namespace Tpl
             return h;
         }
 
-        /// <summary>Adds a character with its feet at <paramref name="position"/>. Returns its id (1 or more).</summary>
-        public int AddCharacter(Vec3 position, double yaw, bool camera = true, int variant = 0)
+        /// <summary>
+        /// Adds a character with its feet at <paramref name="position"/>. Returns its id (1 or more).
+        /// <paramref name="inputDelay"/> false turns off the game's input delay (it is on by default:
+        /// closeness to the original comes first).
+        /// </summary>
+        public int AddCharacter(Vec3 position, double yaw, bool camera = true, int variant = 0, bool inputDelay = true)
         {
-            var c = new Character(_nextId++, Tuning, _col, Units.PositionIn(position, Mode), Units.AngleIn(yaw, Mode), camera, variant);
+            var c = new Character(_nextId++, Tuning, _col, Units.PositionIn(position, Mode), Units.AngleIn(yaw, Mode),
+                                  camera, variant, inputDelay ? Tuning.InputDelayTicks : 0);
             _chars.Add(c);
             return c.Id;
         }
@@ -148,7 +153,7 @@ namespace Tpl
                 Grounded = c.Grounded,
                 Tick = Tick,
                 Position = Units.PositionOut(c.Position, Mode),
-                Velocity = Units.VelocityOut(c.Velocity, Mode, Tuning.TickRate),
+                Velocity = Units.VelocityOut(c.Velocity, Mode, Tuning.TickSeconds),
                 Yaw = Units.AngleOut(c.Yaw, Mode),
                 GroundSurface = c.GroundSurface,
             };
@@ -188,7 +193,15 @@ namespace Tpl
         // ---- rollback support (SPEC.md section 6). Costs nothing unless called.
 
         /// <summary>Bytes <see cref="SaveState"/> needs for the world as it is now.</summary>
-        public int StateSize => Snapshot.HeaderBytes + _chars.Count * Character.SnapshotBytes;
+        public int StateSize
+        {
+            get
+            {
+                int n = Snapshot.HeaderBytes;
+                foreach (Character c in _chars) n += c.SnapshotBytes;
+                return n;
+            }
+        }
 
         /// <summary>
         /// Writes a complete snapshot: tick, ids, every character with its input and camera.
@@ -223,9 +236,17 @@ namespace Tpl
             if (r.U64() != _tuningHash) return "snapshot was made with other tuning";
             long tick = r.I64();
             int nextId = r.I32(), count = r.I32();
-            if (count < 0 || data.Length != Snapshot.HeaderBytes + (long)count * Character.SnapshotBytes) return "snapshot size does not match its character count";
+            if (count < 0 || data.Length < Snapshot.HeaderBytes + (long)count * Character.FixedSnapshotBytes) return "snapshot size does not match its character count";
             var chars = new List<Character>(count);
-            for (int i = 0; i < count; i++) chars.Add(Character.Load(ref r, Tuning, _col));
+            try
+            {
+                for (int i = 0; i < count; i++) chars.Add(Character.Load(ref r, Tuning, _col));
+            }
+            catch (Exception e) when (e is ArgumentOutOfRangeException || e is FormatException)
+            {
+                return "snapshot is cut short or broken";
+            }
+            if (r.Position != data.Length) return "snapshot has extra bytes";
             Tick = tick;
             _nextId = nextId;
             _chars.Clear();

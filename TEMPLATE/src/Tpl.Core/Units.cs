@@ -34,6 +34,11 @@ namespace Tpl
         public const int Handedness = 1;
         /// <summary>1 if native velocity is units per tick, 0 if units per second.</summary>
         public const int VelocityPerTick = 1;
+        /// <summary>
+        /// The real type the simulation computes in, as the game did: 32 = float32, 64 = double,
+        /// 0 = integer or fixed point. The template uses double. Same as TPL_SIM_BITS.
+        /// </summary>
+        public const int SimBits = 64;
 
         // "0.0 - z" instead of "-z" so a zero stays +0 (no "-0" in logs and replays).
 
@@ -52,9 +57,16 @@ namespace Tpl
         public static Vec3 DirectionIn(Vec3 s, UnitMode mode) =>
             mode == UnitMode.Native ? s : new Vec3(s.X, s.Z, 0.0 - s.Y);
 
-        /// <summary>Native velocity to <paramref name="mode"/> (shared: metres per second).</summary>
-        public static Vec3 VelocityOut(Vec3 n, UnitMode mode, int tickRate) =>
-            mode == UnitMode.Native ? n : PositionOut(n, mode) * (VelocityPerTick == 1 ? tickRate : 1);
+        /// <summary>
+        /// Native velocity to <paramref name="mode"/> (shared: metres per second of game time).
+        /// <paramref name="tickSeconds"/> is the simulated step (Tuning.TickSeconds), not 1 / TickRate.
+        /// </summary>
+        public static Vec3 VelocityOut(Vec3 n, UnitMode mode, double tickSeconds)
+        {
+            if (mode == UnitMode.Native) return n;
+            Vec3 p = PositionOut(n, mode);
+            return VelocityPerTick == 1 ? new Vec3(p.X / tickSeconds, p.Y / tickSeconds, p.Z / tickSeconds) : p;
+        }
 
         /// <summary>Native length (distance, radius) to <paramref name="mode"/>.</summary>
         public static double LengthOut(double n, UnitMode mode) => mode == UnitMode.Native ? n : n * MetresPerUnit;

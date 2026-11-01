@@ -11,6 +11,8 @@ namespace Tpl.Native
         public uint Size;
         public int UpAxis, UpSign, Handedness, VelocityPerTick, TickRate;
         public double MetresPerUnit, RadiansPerUnit;
+        public double TickSeconds;
+        public int InputDelayTicks, SimBits;
     }
 
     [StructLayout(LayoutKind.Sequential)]

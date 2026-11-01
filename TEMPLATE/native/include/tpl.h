@@ -10,7 +10,13 @@
  * crosses this API, including the collision callbacks, is then in that convention.
  * Field of view is always radians. Sticks are always -1..1.
  *
- * One tick = 1 / TPL_TICK_RATE seconds. tpl_world_tick(w, n) steps n ticks.
+ * Time: the host calls tpl_world_tick TPL_TICK_RATE times per real second. Each tick simulates
+ * exactly TPL_TICK_SECONDS of game time: the game's real step, which need not be 1 / rate
+ * (Rayman 3 PC: 60 Hz, 0.016 s, so the game runs at 96 % of real time). Shared-unit
+ * velocities are per second of game time. tpl_world_tick(w, n) steps n ticks.
+ * Input: the game reads the pad TPL_INPUT_DELAY_TICKS ticks after tpl_char_input sets it,
+ * like the original. TPL_CHAR_NO_INPUT_DELAY turns that off for one character.
+ * The simulation computes in TPL_SIM_BITS reals, as the game did; the API always uses double.
  * One world is used from one thread at a time. Worlds share nothing.
  * Functions returning int32_t return 1 (or an id) on success, 0 on error;
  * tpl_last_error() then says why.
@@ -21,7 +27,7 @@
  * Collision callbacks needed: ground, segment, overlap. sweep is not used (may be NULL).
  *
  * Rollback: tpl_save_state / tpl_load_state snapshot the whole world (characters, cameras,
- * inputs, tick). tpl_state_hash checks two machines agree. The lib keeps no history and these
+ * inputs including the delayed ones, tick). libtpl keeps no world state of its own (no store). tpl_state_hash checks two machines agree. The lib keeps no history and these
  * cost nothing unless called. The simulation gives the same bits on every machine (no platform
  * maths), and sticks are quantised to steps of 1/127.
  */
@@ -43,7 +49,10 @@ extern "C" {
 #define TPL_NATIVE_UP_SIGN           1   /* +1 or -1 */
 #define TPL_NATIVE_HANDEDNESS        1   /* +1 right-handed, -1 left-handed */
 #define TPL_NATIVE_VELOCITY_PER_TICK 1   /* 1: units per tick, 0: units per second */
-#define TPL_TICK_RATE                60  /* ticks per second (default tuning) */
+#define TPL_TICK_RATE                60  /* ticks per real second the host calls (pacing) */
+#define TPL_TICK_SECONDS             0.016666666666666666 /* game time one tick simulates, exact */
+#define TPL_INPUT_DELAY_TICKS        1   /* ticks before the game reads a new pad */
+#define TPL_SIM_BITS                 64  /* the simulation's reals: 32 = float32, 64 = double, 0 = integer/fixed */
 
 enum {
     TPL_UNITS_NATIVE = 0,
@@ -114,7 +123,8 @@ enum {
 
 /* tpl_char_config.flags */
 enum {
-    TPL_CHAR_NO_CAMERA = 1u << 0,
+    TPL_CHAR_NO_CAMERA      = 1u << 0,
+    TPL_CHAR_NO_INPUT_DELAY = 1u << 1, /* read the pad on the next tick, not the game's delay */
 };
 
 /* ---- small fixed structs (change only with TPL_API_VERSION) ---- */
@@ -158,6 +168,9 @@ typedef struct tpl_units_info {
     int32_t tick_rate;
     double metres_per_unit;
     double radians_per_unit;
+    double tick_seconds;       /* TPL_TICK_SECONDS */
+    int32_t input_delay_ticks; /* TPL_INPUT_DELAY_TICKS */
+    int32_t sim_bits;          /* TPL_SIM_BITS */
 } tpl_units_info;
 
 /*

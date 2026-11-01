@@ -11,7 +11,13 @@ namespace Tpl
     public sealed class Tuning
     {
         [Unverified("Template placeholder. Real libs: the game's logic rate (MEASURE.md M0).")]
-        public int TickRate = 60;
+        public int TickRate = 60;               // ticks per real second the host calls (pacing)
+
+        [Unverified("Template placeholder. Real libs: the game's real simulated step, measured (Rayman 3 PC: 0.016 s at 60 Hz).")]
+        public double TickSeconds = 1.0 / 60;   // seconds of game time one tick simulates
+
+        [Unverified("Template placeholder. Real libs: the game's input delay, measured (Rayman 3 PC: 1 frame).")]
+        public int InputDelayTicks = 1;         // ticks between setting the pad and the game reading it, 0..8
 
         [Unverified("Template placeholder (3 m/s).")]
         public double WalkSpeed = 5;            // cm per tick at full stick
@@ -46,10 +52,14 @@ namespace Tpl
         [Unverified("Template placeholder (about 57 degrees).")]
         public double CameraFovY = 1.0;         // radians, vertical
 
+        public const int MaxInputDelayTicks = 8;
+
         /// <summary>Returns null if the tuning can be used, else the reason it cannot.</summary>
         public string? Validate()
         {
             if (TickRate <= 0) return "TickRate must be > 0";
+            if (!(TickSeconds > 0)) return "TickSeconds must be > 0";
+            if (InputDelayTicks < 0 || InputDelayTicks > MaxInputDelayTicks) return "InputDelayTicks must be 0.." + MaxInputDelayTicks;
             foreach (FieldInfo f in typeof(Tuning).GetFields(BindingFlags.Public | BindingFlags.Instance))
                 if (f.FieldType == typeof(double) && !((double)f.GetValue(this)! >= 0))
                     return f.Name + " must be >= 0";

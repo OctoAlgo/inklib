@@ -47,6 +47,8 @@ namespace Tpl
 
         public SnapshotReader(ReadOnlySpan<byte> buffer) { _b = buffer; _p = 0; }
 
+        public int Position => _p;
+
         public int I32() { int v = BinaryPrimitives.ReadInt32LittleEndian(_b.Slice(_p)); _p += 4; return v; }
         public uint U32() { uint v = BinaryPrimitives.ReadUInt32LittleEndian(_b.Slice(_p)); _p += 4; return v; }
         public long I64() { long v = BinaryPrimitives.ReadInt64LittleEndian(_b.Slice(_p)); _p += 8; return v; }

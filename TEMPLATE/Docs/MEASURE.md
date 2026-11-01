@@ -22,12 +22,19 @@ Write down the method for this game. The usual three:
 Do each item three times. Write down all three values, the game version,
 the place and the method.
 
-## M0. Logic tick rate
+## M0. Tick rate, tick step and input delay
 
-- **What:** How many logic steps per second.
-- **How:** A: count position changes per second of video or log.
-- **Pins:** `Tuning.TickRate`.
-- **Status:** open (template placeholder).
+- **What:** (a) How many logic steps per real second. (b) How much game time
+  one step really simulates: games often step in whole milliseconds or clamp
+  and average dt, so the step need not be 1 / rate (Rayman 3 PC: 16 ms at
+  60 Hz, so the game runs at 96 % of real time). (c) How many steps pass
+  between a button press and the game reacting.
+- **How:** A: log position and the game's own timer every frame; the timer
+  delta is the step. Compare a stopwatch over a long run with the game's
+  timer. For (c), log the pad state next to the position and count frames
+  from press to the first change.
+- **Pins:** `Tuning.TickRate`, `Tuning.TickSeconds`, `Tuning.InputDelayTicks`.
+- **Status:** open (template placeholders).
 
 ## M1. Walk speed
 

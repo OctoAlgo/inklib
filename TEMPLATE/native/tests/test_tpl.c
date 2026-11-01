@@ -42,6 +42,7 @@ int main(void)
     CHECK(u.size == sizeof u);
     CHECK(u.up_axis == TPL_NATIVE_UP_AXIS && u.tick_rate == TPL_TICK_RATE);
     CHECK(u.metres_per_unit == TPL_NATIVE_METRES_PER_UNIT);
+    CHECK(u.tick_seconds == TPL_TICK_SECONDS && u.input_delay_ticks == TPL_INPUT_DELAY_TICKS && u.sim_bits == TPL_SIM_BITS);
 
     /* Errors are errors, not crashes, and they say why. */
     CHECK(tpl_world_create(&wc, NULL) == NULL);
@@ -94,7 +95,7 @@ int main(void)
     /* Jump. */
     in = pad(TPL_BUTTON_JUMP, 0.0f, 0.0f);
     tpl_char_input(w, id, &in);
-    tpl_world_tick(w, 1);
+    tpl_world_tick(w, 1 + TPL_INPUT_DELAY_TICKS); /* the game reads the pad late, like the original */
     tpl_char_state(w, id, &s);
     CHECK(s.state == TPL_STATE_JUMP && s.velocity.y > 0.0);
 
@@ -204,9 +205,9 @@ int main(void)
             tpl_char_input(w, id, &in);
             tpl_world_tick(w, rows[i].ticks);
         }
-        if (tpl_state_hash(w) != 0x04b1bf47678d74b4ull)
+        if (tpl_state_hash(w) != 0x196007041dc1b243ull)
             printf("state hash 0x%016llx\n", (unsigned long long)tpl_state_hash(w));
-        CHECK(tpl_state_hash(w) == 0x04b1bf47678d74b4ull);
+        CHECK(tpl_state_hash(w) == 0x196007041dc1b243ull);
         tpl_world_destroy(w);
     }
 

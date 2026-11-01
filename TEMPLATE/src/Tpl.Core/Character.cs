@@ -32,6 +32,8 @@ namespace Tpl
 
         readonly Tuning _t;
         readonly ICollisionWorld _col;
+        readonly PadInput[] _delayed;   // inputs set but not yet read by the game (ring)
+        int _delayedHead;
         bool _jumpWasDown;
 
         public int Id { get; }
@@ -47,15 +49,19 @@ namespace Tpl
         public SurfaceFlags GroundSurface { get; private set; }
         /// <summary>The game's animation id. The template has none, so it reports the state.</summary>
         public int Anim => (int)State;
+        /// <summary>The pad the host set last. The game reads it <see cref="InputDelayTicks"/> ticks later.</summary>
         public PadInput Input { get; set; }
+        /// <summary>The game's input delay for this character (0 if turned off).</summary>
+        public int InputDelayTicks => _delayed.Length;
 
         /// <summary>Camera heading, radians around +Y.</summary>
         public double CameraYaw { get; private set; }
         public Vec3 CameraPosition { get; private set; }
         public Vec3 CameraTarget { get; private set; }
 
-        Character(int id, Tuning tuning, ICollisionWorld collision, bool camera, int variant)
+        Character(int id, Tuning tuning, ICollisionWorld collision, bool camera, int variant, int inputDelay)
         {
+            _delayed = new PadInput[inputDelay];
             Id = id;
             _t = tuning;
             _col = collision;
@@ -63,8 +69,8 @@ namespace Tpl
             Variant = variant;
         }
 
-        internal Character(int id, Tuning tuning, ICollisionWorld collision, Vec3 feet, double yaw, bool camera, int variant)
-            : this(id, tuning, collision, camera, variant)
+        internal Character(int id, Tuning tuning, ICollisionWorld collision, Vec3 feet, double yaw, bool camera, int variant, int inputDelay)
+            : this(id, tuning, collision, camera, variant, inputDelay)
         {
             Position = feet;
             Yaw = yaw;
@@ -80,14 +86,28 @@ namespace Tpl
             UpdateCamera();
         }
 
-        /// <summary>Bytes one character takes in a snapshot.</summary>
-        internal const int SnapshotBytes = 5 * 4 + 2 * 8 + 4 * 24 + 5 * 4;
+        const int InputBytes = 5 * 4;
+        internal const int FixedSnapshotBytes = 7 * 4 + 2 * 8 + 4 * 24 + InputBytes;
+
+        /// <summary>Bytes this character takes in a snapshot.</summary>
+        internal int SnapshotBytes => FixedSnapshotBytes + _delayed.Length * InputBytes;
+
+        static void SaveInput(ref SnapshotWriter w, PadInput p)
+        {
+            w.U32((uint)p.Buttons);
+            w.F32(p.MoveX); w.F32(p.MoveY); w.F32(p.LookX); w.F32(p.LookY);
+        }
+
+        static PadInput LoadInput(ref SnapshotReader r) =>
+            new PadInput { Buttons = (Buttons)r.U32(), MoveX = r.F32(), MoveY = r.F32(), LookX = r.F32(), LookY = r.F32() };
 
         /// <summary>Writes everything that shapes later ticks. Keep in step with <see cref="Load"/>.</summary>
         internal void Save(ref SnapshotWriter w)
         {
             w.I32(Id);
             w.I32(Variant);
+            w.I32(_delayed.Length);
+            w.I32(_delayedHead);
             w.U32((HasCamera ? 1u : 0) | (Grounded ? 2u : 0) | (_jumpWasDown ? 4u : 0));
             w.I32((int)State);
             w.U32((uint)GroundSurface);
@@ -97,16 +117,19 @@ namespace Tpl
             w.F64(CameraYaw);
             w.V3(CameraPosition);
             w.V3(CameraTarget);
-            w.U32((uint)Input.Buttons);
-            w.F32(Input.MoveX); w.F32(Input.MoveY); w.F32(Input.LookX); w.F32(Input.LookY);
+            SaveInput(ref w, Input);
+            foreach (PadInput p in _delayed) SaveInput(ref w, p);
         }
 
         internal static Character Load(ref SnapshotReader r, Tuning tuning, ICollisionWorld collision)
         {
-            int id = r.I32(), variant = r.I32();
+            int id = r.I32(), variant = r.I32(), delay = r.I32(), head = r.I32();
+            if (delay < 0 || delay > Tuning.MaxInputDelayTicks || head < 0 || (head >= delay && head != 0))
+                throw new FormatException("bad input delay in snapshot");
             uint flags = r.U32();
-            var c = new Character(id, tuning, collision, (flags & 1) != 0, variant)
+            var c = new Character(id, tuning, collision, (flags & 1) != 0, variant, delay)
             {
+                _delayedHead = head,
                 Grounded = (flags & 2) != 0,
                 _jumpWasDown = (flags & 4) != 0,
             };
@@ -118,7 +141,8 @@ namespace Tpl
             c.CameraYaw = r.F64();
             c.CameraPosition = r.V3();
             c.CameraTarget = r.V3();
-            c.Input = new PadInput { Buttons = (Buttons)r.U32(), MoveX = r.F32(), MoveY = r.F32(), LookX = r.F32(), LookY = r.F32() };
+            c.Input = LoadInput(ref r);
+            for (int i = 0; i < delay; i++) c._delayed[i] = LoadInput(ref r);
             return c;
         }
 
@@ -126,7 +150,14 @@ namespace Tpl
 
         internal void Step(long tick, Action<Event> emit)
         {
+            // The game reads the pad InputDelayTicks ticks after the host sets it.
             PadInput pad = Input;
+            if (_delayed.Length > 0)
+            {
+                pad = _delayed[_delayedHead];
+                _delayed[_delayedHead] = Input;
+                _delayedHead = (_delayedHead + 1) % _delayed.Length;
+            }
             MoveState before = State;
 
             CameraYaw = Units.WrapAngle(CameraYaw - pad.LookX * _t.CameraTurnSpeed);
