@@ -26,14 +26,13 @@ existing libs stand ([COMPLIANCE.md](COMPLIANCE.md)).
    camera out of the state, versioned structs, shared units, snapshot,
    event ids, move lockstep code out to inklib-net, measure tick step and
    input delay.
-3. libray3: apply COMPLIANCE.md: DetMath for the 13 platform-maths sites
+3. libray3: apply COMPLIANCE.md: DetMathF (copy TEMPLATE/src/Tpl.Core/DetMathF.cs)
+   for the 13 platform-maths sites, touch tolerance, hooks in ray3_hooks.h,
    (float32 stays), TickSeconds 0.016, 1-tick input delay, world API,
    snapshot, events, macOS CI, inklib-replay format.
-4. Template: a float32 DetMath variant for float32 libs (spec allows it,
-   template only has double).
-5. Template: an example of a lib-owned store (SPEC.md section 6, "Lib-owned
+4. Template: an example of a lib-owned store (SPEC.md section 6, "Lib-owned
    world state") once the Splatoon lib starts.
-6. inklib-net and inklib-arena: spec only; start code when two libs comply.
-7. Template: implement the host hooks (SPEC.md section 14) and loadout
+5. inklib-net and inklib-arena: spec only; start code when two libs comply.
+6. Template: implement the host hooks (SPEC.md section 14) and loadout
    (section 12) as a reference, with snapshot tests. Spec only so far.
-8. COMPLIANCE.md: add an sp2 (Splatoon 2) table once its repo can be read.
+7. COMPLIANCE.md: add an sp2 (Splatoon 2) table once its repo can be read.

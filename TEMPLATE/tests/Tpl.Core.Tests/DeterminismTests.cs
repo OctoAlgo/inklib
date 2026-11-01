@@ -37,6 +37,34 @@ namespace Tpl.Tests
 
         const string Golden = "0x40698e7e61f762cf";
 
+        [Theory]
+        [InlineData(0f)] [InlineData(0.5f)] [InlineData(-1.2f)] [InlineData(3f)] [InlineData(100.25f)] [InlineData(-1000f)]
+        public void DetMathFIsCloseToMath(float x)
+        {
+            double tol = 2e-6 + System.Math.Abs(x) * 4e-8;   // float 2*pi is off by ~2e-7, so big angles drift a little
+            Assert.True(System.Math.Abs(DetMathF.Sin(x) - System.Math.Sin(x)) < tol, "sin");
+            Assert.True(System.Math.Abs(DetMathF.Cos(x) - System.Math.Cos(x)) < tol, "cos");
+            Assert.True(System.Math.Abs(DetMathF.Atan(x) - System.Math.Atan(x)) < 1e-6, "atan");
+            Assert.True(System.Math.Abs(DetMathF.Atan2(x, 0.7f) - System.Math.Atan2(x, 0.7f)) < 1e-6, "atan2");
+            Assert.True(System.Math.Abs(DetMathF.Atan2(0.3f, -x) - System.Math.Atan2(0.3f, -x)) < 1e-6, "atan2 left");
+        }
+
+        /// <summary>Golden bits for the float32 version: must be the same on every machine.</summary>
+        [Fact]
+        public void DetMathFGoldenBits()
+        {
+            float sum = 0;
+            for (int i = -500; i <= 500; i++)
+            {
+                float x = i * 0.0173f;
+                float term = DetMathF.Sin(x) + DetMathF.Cos(x) * 0.5f + DetMathF.Atan2(x, 1.5f - x) * 0.25f;
+                sum = sum + term;
+            }
+            Assert.Equal(GoldenF, "0x" + System.BitConverter.SingleToInt32Bits(sum).ToString("x8"));
+        }
+
+        const string GoldenF = "0x434c73eb";
+
         /// <summary>Platform maths and other sources of difference must not appear in Core (outside DetMath.cs).</summary>
         [Fact]
         public void CoreUsesNoPlatformMaths()
@@ -46,7 +74,7 @@ namespace Tpl.Tests
             string dir = Path.Combine(Repo.Root(), "src", "Tpl.Core");
             foreach (string file in Directory.GetFiles(dir, "*.cs"))
             {
-                if (Path.GetFileName(file) == "DetMath.cs") continue;
+                if (Path.GetFileName(file) == "DetMath.cs" || Path.GetFileName(file) == "DetMathF.cs") continue;
                 string[] lines = File.ReadAllLines(file);
                 for (int i = 0; i < lines.Length; i++)
                 {

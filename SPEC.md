@@ -239,8 +239,9 @@ A lib meets this one of two ways.
      variable or cast it (`(float)`), so no runtime keeps extra precision. RyuJIT computes `float` in
      single precision; check other runtimes before relying on them.
    - Only `+ - * /`, comparisons, `Math.Abs/Min/Max/Floor/Ceiling/Round/Truncate/Sign/Clamp` and the
-     lib's own `DetMath` (template: `DetMath.cs`, double; a float32 lib keeps a float32 `DetMath`, or
-     computes in double and rounds once to float, which is also deterministic). IEEE 754 makes
+     lib's own `DetMath` (template: `DetMath.cs` for double and `DetMathF.cs` for float32, same functions, both checked
+     bit for bit on three platforms; a float32 lib may also compute in double and round once to
+     float, which is deterministic too). IEEE 754 makes
      these the same everywhere.
      `DetMath.Sqrt` is `Math.Sqrt`, which IEEE 754 requires to be correctly rounded.
    - No `Math.Sin/Cos/Tan/Asin/Acos/Atan/Atan2/Pow/Exp/Log/Cbrt`, no `MathF`: they come from the
