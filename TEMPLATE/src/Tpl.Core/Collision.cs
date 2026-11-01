@@ -22,6 +22,16 @@ namespace Tpl
         CameraPass = 1u << 9,
     }
 
+    /// <summary>Collision rules shared with the host (SPEC.md section 4).</summary>
+    public static class CollisionRules
+    {
+        /// <summary>
+        /// Native length units (cm). A shape closer to a surface than this, or overlapping it by less,
+        /// is touching: it blocks only a move into the surface. Same as TPL_TOUCH_TOLERANCE.
+        /// </summary>
+        public const double TouchTolerance = 0.5;
+    }
+
     /// <summary>Flags for <see cref="ICollisionWorld.Segment"/>. Values match TPL_SEGMENT_*.</summary>
     [Flags]
     public enum SegmentFlags : uint
