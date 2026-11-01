@@ -34,6 +34,8 @@ C API v7 only. Every ❔ needs a look in the repo.
 | 6 State hash | 🟡 A hash exists for the lockstep check (what it covers ❔). | Expose it as `fc_state_hash` = FNV-1a 64 over the snapshot bytes. The hash changes, so old lockstep peers do not match new ones (API v8 anyway). |
 | 6 Event ids | ❔ | `id` (same on resimulation) and `tick` on every event. |
 | 6 Input quantisation | ✅ The game reads PS1 pad bytes. | Make the stick handling depend only on `round(stick * 127)` (map it onto the pad byte), so inklib-net can send 4 stick bytes. |
+| 12 Loadout | 🟡 Weapons per slot exist (15 VS weapons, 3 slots, `rearm`). List/equip shape unknown. | `fc_loadout_list`, `fc_equip`, `fc_equipped` in the weapons module; equipped weapons in the snapshot. |
+| 14 Host hooks | unknown | Teleport, impulse, hurt (with `invulnerable_ticks`, HURT event), mount/unmount (libfc's pilot/park may map onto it), action enum, aim offset, in `fc_hooks.h`. |
 | 13 Netcode out of the lib | ❔ The lockstep 1v1 code: inside libfc or in the host? | If it is inside libfc, move it out: it becomes the first piece of inklib-net (lockstep = the zero-rollback case). libfc keeps only snapshot, hash, events and replays. |
 | 7 Camera | 🟡 The game's chase camera is in the state: position, pitch/yaw/roll, rotation rows. | `fc_char_camera`: `style` (`CHASE` / `TOP_DOWN`), `position`, `target`, `up`, `fov_y`. Pitch/yaw/roll and rows may stay as fields after the standard ones. Look input through `look_x/y`. |
 | 8 Provenance | ❔ | `[Verified]` / `[Unverified]` on every tuning number, the tests, MEASURE.md. |
@@ -77,6 +79,8 @@ Read from OctoAlgo/libray3 at commit `484385e` (2026-10-31).
 | 6 Event ids | ❌ No events yet. | Add events with `id` and `tick` from the start. |
 | 6 Input quantisation | ❌ Stick floats are used as given. | Quantise to `round(stick * 127) / 127` in `ray3_char_input`. |
 | 13 Netcode out of the lib | ✅ None. | None. |
+| 12 Loadout | unknown (power-ups exist in the game: copter, big fist, ...). | `ray3_loadout_list` / `ray3_equip` / `ray3_equipped` for the power-ups. |
+| 14 Host hooks | 🟡 Built for InkArena as C API 21-26: teleport + add impulse (21) and hurt (22) merged; mount (23), HURT event (24), action (25), aim offset (26) pending merge (libray3 #34-#37). | Check the names and return values against section 14 (hurt: 1 / 0 / -1), add `invulnerable_ticks` to the state, HURT = event type 5, action values from the common core, move the hooks into `ray3_hooks.h` + `ray3_get_hooks_api()`, and put their state in the snapshot. |
 | 7 Camera | ❌ Out of scope in PLAN.md. MEASURE M6 notes that turning is done by the camera's script. | Ship Rayman 3's third-person camera (`THIRD_PERSON`): research, look input, `ray3_char_camera`. This is the largest piece of new work. |
 | 8 Provenance | ✅ `[Verified]` / `[Unverified]` on every tuning field, `ProvenanceTests`, header comments checked by `HeaderTests`. | Add the "every UNVERIFIED field is in MEASURE.md" test. Today `CoyoteGroundGravity` and `LedgeGrabAllSides` are not named as `Tuning.X` there. |
 | 9 Data rules | ✅ No game files, no copied code (CLAUDE.md rules 3-4), `.gitignore` backstop. | Add the CI data check. |

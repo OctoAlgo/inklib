@@ -34,3 +34,6 @@ existing libs stand ([COMPLIANCE.md](COMPLIANCE.md)).
 5. Template: an example of a lib-owned store (SPEC.md section 6, "Lib-owned
    world state") once the Splatoon lib starts.
 6. inklib-net and inklib-arena: spec only; start code when two libs comply.
+7. Template: implement the host hooks (SPEC.md section 14) and loadout
+   (section 12) as a reference, with snapshot tests. Spec only so far.
+8. COMPLIANCE.md: add an sp2 (Splatoon 2) table once its repo can be read.

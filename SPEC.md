@@ -426,6 +426,28 @@ gets its own standard when it starts:
 
 Arena rules (meeting characters, scoring, unit scale between games) MUST NOT appear in a core lib.
 
+### Loadout (optional)
+
+The lib lists what its game offers and equips it from the user's game data. Examples: libfc's 15 VS
+weapons in 3 slots; libray3's power-ups (copter, big fist, ...); sp2's kits (main + sub; the special
+stays the host's "ultimate"). Durations, cooldowns, balance and UI are the host's job.
+
+```c
+typedef struct <p>_loadout_item {
+    uint32_t size;
+    int32_t id;          /* lib-owned, stable, 1 or more */
+    int32_t slot;        /* lib-defined slot number, 0 or more */
+    int32_t available;   /* 1 if the user's data has it, 0 if not */
+    char name[64];       /* UTF-8, NUL-terminated, the game's name */
+} <p>_loadout_item;
+
+int32_t <p>_loadout_list(const <p>_world *world, <p>_loadout_item *out, int32_t max); /* count; max 0 = just count */
+int32_t <p>_equip(<p>_world *world, int32_t char_id, int32_t slot, int32_t item_id);  /* item 0 = empty the slot */
+int32_t <p>_equipped(const <p>_world *world, int32_t char_id, int32_t slot);          /* item id, 0 = empty */
+```
+
+What is equipped is part of the snapshot. Equipping uses the game's own rules for what the item does.
+
 ## 13. inklib-net (optional add-on, planned)
 
 inklib-net is a later, separate add-on for online play. It is described here so every lib is built
@@ -455,4 +477,66 @@ It is GGPO-style rollback over any inklib (or several), through the function tab
   character plus the hashes.
 
 What inklib-net does not do: matchmaking, NAT punch-through, accounts, voice. Those belong to the host.
+
+## 14. Host hooks (optional)
+
+Hosts that put a character into their own game (the InkArena battler is the first) need a few ways in.
+They are optional: a lib MAY offer them; they cost nothing when unused; their state (hurt timers,
+seat, aim offsets) is part of the snapshot. They live in `<p>_hooks.h` with a table from
+`<p>_get_hooks_api()` (NULL if the lib has none). All values are in the world's unit convention.
+Every lib documents in its header what each hook does in its game, and its own numbers are tagged
+VERIFIED or UNVERIFIED like any tuning (UNVERIFIED until recorded in the game).
+
+```c
+/* Moves the character without making a new one. Works in the air: it stands if there is ground under
+   feet and velocity is not upwards, else it falls. Running sequences (a jump, a climb) end;
+   equipment stays. reset_camera 1 puts the camera back behind the character. */
+int32_t <p>_teleport(<p>_world *w, int32_t id, const <p>_vec3 *feet, const <p>_vec3 *velocity,
+                     double yaw, int32_t reset_camera);
+
+/* Velocity change. In the air it adds. On the ground only an upward part counts: if there is one, the
+   whole impulse applies and the character leaves the ground; if not, nothing happens. */
+int32_t <p>_add_impulse(<p>_world *w, int32_t id, const <p>_vec3 *impulse);
+
+/* Hurts the character: a hurt state with knockback along direction (unit vector) scaled by strength,
+   then no-control ticks and invulnerable ticks (lib values). Returns 1 if hurt, 0 if invulnerable,
+   -1 on error (last error set). Emits <P>_EVENT_HURT. */
+int32_t <p>_hurt(<p>_world *w, int32_t id, const <p>_vec3 *direction, double strength);
+
+/* Pins the character to a seat (vehicles, rides). Call every tick before <p>_world_tick while seated.
+   Velocity becomes the seat's motion; movement input is ignored. Whether attacks stay allowed and
+   whether a hurt unmounts are the lib's choice, documented in its header. */
+int32_t <p>_mount(<p>_world *w, int32_t id, const <p>_vec3 *seat, double yaw);
+int32_t <p>_unmount(<p>_world *w, int32_t id, const <p>_vec3 *impulse);   /* impulse may be NULL */
+
+/* The animation the character shows this tick: <P>_ACTION_*, -1 on error. */
+int32_t <p>_get_action(const <p>_world *w, int32_t id);
+
+/* Where to aim at a host target (target = the host's id, as in <p>_hit.actor): the game's rule plus
+   offset. NULL offset goes back to the game's rule alone. */
+int32_t <p>_set_aim_offset(<p>_world *w, int32_t id, int32_t target, const <p>_vec3 *offset);
+```
+
+- **Invulnerability.** `<p>_state` gains `invulnerable_ticks` (ticks left, 0 = can be hurt), appended
+  at the end like any new field.
+- **HURT event.** `<P>_EVENT_HURT` = 5 (standard). `position` = where, `a` = strength x 1000 rounded,
+  `b` = invulnerable ticks given.
+- **Action.** A lib-owned enum next to the movement state, for the host's animation. It is never the
+  game's own state numbers (those may change as a lib learns more). Recommended common core, so hosts
+  can share animation sets; a lib uses the ones its game has and adds its own from 256:
+
+| Value | Name | Value | Name |
+|---|---|---|---|
+| 0 | `IDLE` | 9 | `JUMP_APEX` |
+| 1 | `MOVE_START` | 10 | `FALL` |
+| 2 | `MOVE` | 11 | `LAND` |
+| 3 | `MOVE_STOP` | 12 | `HARD_LAND` |
+| 4 | `STRAFE_FORWARD` | 13 | `HURT` |
+| 5 | `STRAFE_BACK` | 14 | `MOUNTED` |
+| 6 | `STRAFE_LEFT` | 15 | `ATTACK_CHARGE` |
+| 7 | `STRAFE_RIGHT` | 16 | `ATTACK` |
+| 8 | `JUMP_RISE` | | |
+
+- `<p>_hurt` returns 0 for "invulnerable", which is not an error: this is the one exception to the
+  return rule in section 2, and -1 is its error.
 
