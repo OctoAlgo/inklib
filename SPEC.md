@@ -365,8 +365,14 @@ Every gameplay number is VERIFIED (with its source) or UNVERIFIED (with the reas
   `data_path`. Asset tools in a lib read the user's copy and write to the user's disk, never to the repo.
 - Single numbers with a source note are fine. Tables of numbers read from the game are fine if the lib
   reads them from the user's data at run time instead of shipping them.
-- No copied code from decompilations, disassembly or game executables. Read them to understand; write
-  your own code. No translated functions, structs or tables.
+- Code comes in three kinds, and each has its own rule:
+  - **Other projects' code** (community decompilations, viewers, emulators, tools): never copied or
+    translated. Read it to understand; write your own code. Only its licence decides otherwise (next rule).
+  - **The game's own logic**: a lib MAY port it faithfully from its own reading of the game's executable
+    (function by function, structs included), because closeness to the original is the first goal. The
+    README says which parts are such ports. Ports contain logic only, never the game's data.
+  - **The game's tables** (sine tables, curves, lists): data, not code. Read them from the user's copy at
+    run time or rebuild them from their formula; never ship them in source.
 - Code from other open projects only with a fitting licence (MIT, BSD, Apache-2.0, zlib, public
   domain), named at the top of the file. Never GPL, LGPL, AGPL or unlicensed code.
 - Each README says it is a fan project and that the user needs their own copy of the game.

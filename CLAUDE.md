@@ -16,7 +16,7 @@ existing libs stand ([COMPLIANCE.md](COMPLIANCE.md)).
 - The template must build and pass CI (`.github/workflows/template.yml`,
   including copy-and-rename). Recording replays again changes their hash;
   update `TEMPLATE/native/tests/test_tpl.c` too.
-- No game data, no copied code, no licence chosen (TODO for octo).
+- No game data, no copied code from other projects (faithful ports of the game's own logic are allowed, SPEC section 9), no licence chosen (TODO for octo).
 - Small PRs. Push after every finished step. Keep "Next" below current.
 
 ## Next

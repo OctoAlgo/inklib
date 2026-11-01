@@ -38,9 +38,12 @@ draw and play.
    data reaches the lib only at run time from the user's own copy
    (`data_path`). `.gitignore` and CI block common extensions; that is a
    backstop, not permission.
-6. **No copied code.** Decompilations, disassembly and tools may be read to
-   understand the game. Write our own code. Do not paste or translate their
-   functions, structs or tables. Single numbers with a source note are fine.
+6. **No copied code from other projects.** Community decompilations, viewers
+   and tools may be read to understand the game; write our own code, never
+   paste or translate theirs. Faithful ports of the game's own logic from our
+   own reading of its executable are allowed (SPEC.md section 9); the README
+   names them. The game's tables are data: read them from the user's copy or
+   rebuild them from a formula. Single numbers with a source note are fine.
    Code from open projects only under MIT, BSD, Apache-2.0, zlib or public
    domain, named at the top of the file. Never GPL, LGPL, AGPL or unlicensed.
 7. **Every gameplay number is tagged.** Each `Tuning` field has exactly one of
